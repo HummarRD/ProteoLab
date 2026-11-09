@@ -1,0 +1,804 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="ProteoLab: simulador didáctico de proteómica basada en gel 2D (Choi et al., 2018).">
+<meta name="author" content="Humberto Martínez-Orozco">
+<title>ProteoLab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}
+
+/* Layout: banda superior con el flujo de 6 módulos del protocolo; debajo, panel de control (izq.) + banco de trabajo visual (der.) */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --ink:#18212f; --muted:#5a6678; --line:#d8dee8;
+  --accent:#2747b0; --cut:#c2366b; --basic:#2f7fd0; --cys:#c98a00; --pro:#7a52b8;
+  --ok:#1f8a5b; --bad:#c0392b; --accent-soft:#e6ebf8; --gel:#eef0f3; --silver:#3b2e22;
+  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  --fs:16px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f141c; --surface:#171e29; --ink:#e4e9f1; --muted:#9aa6b8; --line:#2a3443;
+  --accent:#7f9bff; --cut:#ff6fa0; --basic:#6fb5ff; --cys:#f2be3d; --pro:#b392f0;
+  --ok:#4cc58d; --bad:#ff7a6b; --accent-soft:#1f2a44; --gel:#d9dce2; --silver:#3b2e22; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0f141c; --surface:#171e29; --ink:#e4e9f1; --muted:#9aa6b8; --line:#2a3443;
+  --accent:#7f9bff; --cut:#ff6fa0; --basic:#6fb5ff; --cys:#f2be3d; --pro:#b392f0;
+  --ok:#4cc58d; --bad:#ff7a6b; --accent-soft:#1f2a44; --gel:#d9dce2; --silver:#3b2e22; color-scheme:dark;}
+html{font-size:var(--fs)}
+.proj{--fs:20px}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:1rem;line-height:1.5}
+.wrap{max-width:1280px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:1.9rem;font-weight:700;letter-spacing:-.01em}
+h2{font-size:1.35rem;font-weight:700}
+h3{font-size:1.05rem;font-weight:500}
+p{margin:0}
+.eyebrow{font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600}
+header.top{display:flex;flex-wrap:wrap;gap:14px;align-items:end;justify-content:space-between}
+.brand p{color:var(--muted);max-width:68ch}
+.modes{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;color:var(--ink);font:600 .9rem var(--f-body);padding:8px 14px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 .9rem var(--f-body);padding:8px 14px;border-radius:8px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+.pipeline{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.stage{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 12px;text-align:left;cursor:pointer;color:var(--ink);font:inherit;display:flex;flex-direction:column;gap:2px;min-width:0}
+.stage .n{font:600 .75rem var(--f-mono);color:var(--muted)}
+.stage .t{font:500 .95rem var(--f-display)}
+.stage .s{font-size:.75rem;color:var(--muted)}
+.stage[aria-current="step"]{border-color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}
+@media (max-width:860px){.pipeline{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:460px){.pipeline{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.protocol{font-size:.85rem;color:var(--muted);border-left:3px solid var(--accent);padding-left:10px;max-width:110ch}
+
+.bench{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.bench{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label,.lbl{font-size:.82rem;font-weight:600;color:var(--muted)}
+select,input[type=number]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%;box-sizing:border-box}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.chk{display:flex;gap:8px;align-items:flex-start;font-size:.9rem}
+.chk input{margin-top:4px;accent-color:var(--accent)}
+.note{font-size:.85rem;color:var(--muted)}
+.warn{font-size:.85rem;color:var(--bad)}
+
+.guide-step{display:flex;flex-direction:column;gap:10px}
+.guide-step .count{font:600 .8rem var(--f-mono);color:var(--accent)}
+.formula{font-family:var(--f-mono);font-size:.85rem;background:var(--accent-soft);border-radius:8px;padding:8px 10px;overflow-x:auto}
+.dots{display:flex;gap:6px;flex-wrap:wrap}
+.dots span{width:9px;height:9px;border-radius:50%;background:var(--line)}
+.dots span.on{background:var(--accent)}
+.cite{font-size:.8rem;color:var(--muted)}
+
+.viz{display:flex;flex-direction:column;gap:14px;min-width:0}
+.canvas-box{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;position:relative}
+canvas{display:block;width:100%;height:400px}
+.stage-tag{position:absolute;top:10px;right:12px;font:600 .78rem var(--f-mono);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px 8px;color:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.8rem;color:var(--muted);padding:8px 12px;border-top:1px solid var(--line)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stats.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:620px){.stats,.stats.three{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+.stat b{display:block;font:700 1.3rem var(--f-display);font-variant-numeric:tabular-nums}
+.stat span{font-size:.78rem;color:var(--muted)}
+
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface);max-height:420px;overflow-y:auto}
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
+th{position:sticky;top:0;background:var(--surface);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);z-index:1}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--f-mono)}
+td.pep{font-family:var(--f-mono);white-space:normal;word-break:break-all;min-width:14ch}
+td.wrap{white-space:normal;min-width:22ch}
+tr.out td{opacity:.42}
+tr.hl td{background:var(--accent-soft)}
+tr.click{cursor:pointer}
+.pill{display:inline-block;font-size:.72rem;font-weight:600;padding:2px 8px;border-radius:99px}
+.pill.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.pill.no{background:color-mix(in srgb,var(--muted) 18%,transparent);color:var(--muted)}
+.pill.ox{background:color-mix(in srgb,var(--cys) 22%,transparent);color:var(--ink)}
+.pill.ph{background:color-mix(in srgb,var(--pro) 22%,transparent);color:var(--ink)}
+.mod-c{color:var(--cys);font-weight:700}
+.mod-p{color:var(--pro);font-weight:700}
+
+.timeline{display:grid;grid-template-columns:110px repeat(14,minmax(0,1fr));gap:3px;font-size:.78rem;align-items:center}
+.timeline .d{text-align:center;color:var(--muted);font-family:var(--f-mono);font-size:.7rem}
+.timeline .c{height:24px;border-radius:4px;background:var(--bg);border:1px solid var(--line)}
+.timeline .c.r{background:color-mix(in srgb,var(--accent) 55%,transparent);border-color:var(--accent)}
+.timeline .c.x{background:var(--cut);border-color:var(--cut)}
+.timeline .g{font-weight:600}
+.tl-wrap{overflow-x:auto}
+.tl-inner{min-width:520px}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:700px){.steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stepcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);display:flex;flex-direction:column;gap:4px;min-width:0}
+.stepcard.on{border-color:var(--accent);box-shadow:inset 0 3px 0 var(--accent)}
+.stepcard b{font-family:var(--f-display);font-weight:500}
+.stepcard span{font-size:.82rem;color:var(--muted)}
+
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-family:var(--f-mono);font-size:11px}
+.chart .axis{stroke:var(--line)}
+.chart .grid{stroke:var(--line);stroke-dasharray:2 3}
+
+.bar-cell{width:180px;min-width:140px}
+.dbar{position:relative;height:12px;background:var(--bg);border-radius:3px}
+.dbar .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--muted)}
+.dbar i{position:absolute;top:0;height:100%;border-radius:3px}
+.dbar .th{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--cut);opacity:.7}
+
+.quiz{display:flex;flex-direction:column;gap:16px}
+.q{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.q .opts{display:flex;flex-direction:column;gap:6px}
+.q label{display:flex;gap:8px;align-items:flex-start;font-size:.92rem;cursor:pointer;border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+.q label input{margin-top:4px;accent-color:var(--accent)}
+.q label.right{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+.q label.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,transparent)}
+.fb{font-size:.88rem;border-left:3px solid var(--accent);padding-left:10px}
+.score{font:700 1.1rem var(--f-display)}
+
+.ladder{display:flex;flex-wrap:wrap;align-items:center;row-gap:10px;font-family:var(--f-mono);padding:6px 0}
+.ladder .aa{display:inline-flex;flex-direction:column;align-items:center;min-width:1.35em;font-weight:600;border-radius:4px;padding:1px 2px;line-height:1.1}
+.ladder .aa sub{font-size:.55rem;color:var(--muted);font-weight:400}
+.ladder .aa.c{outline:2px solid var(--cys)}
+.ladder .aa.p{outline:2px solid var(--pro)}
+.ladder .brk{display:inline-flex;flex-direction:column;justify-content:space-between;height:2.1em;width:5px}
+.ladder .brk i{display:block;width:2px;height:.8em;margin:0 auto;background:transparent}
+.ladder .brk i.bb.on{background:var(--basic)}
+.ladder .brk i.yy.on{background:var(--cut)}
+.soon-panel ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.refs{font-size:.85rem;color:var(--muted)}
+.refs ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:5px;max-width:115ch}
+.refs a{color:var(--accent)}
+footer.credit{font-size:.8rem;color:var(--muted)}
+.proj .side-text{display:none}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="app">
+  <header class="top">
+    <div class="brand">
+      <div class="eyebrow">Simulador didáctico · Proteómica basada en gel 2D</div>
+      <h1>ProteoLab</h1>
+      <p class="side-text">Recorre, paso a paso, el protocolo de Choi et al. (2018) para estudiar el hipocampo de ratones con estrés crónico por restricción: del animal a la identificación de UCH-L1 y sus cisteínas oxidadas.</p>
+    </div>
+    <div class="modes">
+      <div class="seg" role="group" aria-label="Modo de uso">
+        <button id="m-guide" aria-pressed="true">Guiado</button>
+        <button id="m-explore" aria-pressed="false">Exploración</button>
+        <button id="m-eval" aria-pressed="false">Evaluación</button>
+      </div>
+      <button class="btn" id="projBtn" aria-pressed="false">Modo proyección</button>
+    </div>
+  </header>
+
+  <nav class="pipeline" aria-label="Etapas del protocolo" id="pipe"></nav>
+  <p class="protocol" id="protoLine"></p>
+
+  <section class="bench" id="bench">
+    <aside class="panel" id="side"></aside>
+    <div class="viz" id="viz"></div>
+  </section>
+  <section class="panel soon-panel" id="soon" hidden></section>
+
+  <section class="panel refs" aria-labelledby="refsH">
+    <h3 id="refsH">Fuentes de este módulo</h3>
+    <ol id="refList"></ol>
+  </section>
+  <footer class="credit">ProteoLab · versión 1.0 · Protocolo base: Choi et al., Mol Cell Proteomics 2018 · Diseño docente: Humberto Martínez-Orozco</footer>
+</div>
+
+<script>
+(()=>{
+/* =============== Referencias =============== */
+const REF={
+ choi:'Choi JE, Lee JJ, Kang W, Kim HJ, Cho JH, Han PL, Lee KJ. Proteomic analysis of hippocampus in a mouse model of depression reveals neuroprotective function of ubiquitin C-terminal hydrolase L1 (UCH-L1) via stress-induced cysteine oxidative modifications. <i>Mol Cell Proteomics</i>. 2018;17(9):1803–1823. <a href="https://doi.org/10.1074/mcp.RA118.000835" target="_blank" rel="noopener">doi:10.1074/mcp.RA118.000835</a>',
+ gage:'Gage GJ, Kipke DR, Shain W. Whole animal perfusion fixation for rodents. <i>J Vis Exp</i>. 2012;(65):e3564. <a href="https://doi.org/10.3791/3564" target="_blank" rel="noopener">doi:10.3791/3564</a>',
+ smith:'Smith PK, Krohn RI, Hermanson GT, et al. Measurement of protein using bicinchoninic acid. <i>Anal Biochem</i>. 1985;150(1):76–85. <a href="https://doi.org/10.1016/0003-2697(85)90442-7" target="_blank" rel="noopener">doi:10.1016/0003-2697(85)90442-7</a>',
+ gorg:'Görg A, Weiss W, Dunn MJ. Current two-dimensional electrophoresis technology for proteomics. <i>Proteomics</i>. 2004;4(12):3665–3685. <a href="https://doi.org/10.1002/pmic.200401031" target="_blank" rel="noopener">doi:10.1002/pmic.200401031</a>',
+ bjell:'Bjellqvist B, Hughes GJ, Pasquali C, et al. The focusing positions of polypeptides in immobilized pH gradients can be predicted from their amino acid sequences. <i>Electrophoresis</i>. 1993;14(10):1023–1031. <a href="https://doi.org/10.1002/elps.11501401163" target="_blank" rel="noopener">doi:10.1002/elps.11501401163</a>',
+ laem:'Laemmli UK. Cleavage of structural proteins during the assembly of the head of bacteriophage T4. <i>Nature</i>. 1970;227:680–685. <a href="https://doi.org/10.1038/227680a0" target="_blank" rel="noopener">doi:10.1038/227680a0</a>',
+ silver:'Chevallet M, Luche S, Rabilloud T. Silver staining of proteins in polyacrylamide gels. <i>Nat Protoc</i>. 2006;1(4):1852–1858. <a href="https://doi.org/10.1038/nprot.2006.288" target="_blank" rel="noopener">doi:10.1038/nprot.2006.288</a>',
+ shev:'Shevchenko A, Tomas H, Havlis J, Olsen JV, Mann M. In-gel digestion for mass spectrometric characterization of proteins and proteomes. <i>Nat Protoc</i>. 2006;1(6):2856–2860. <a href="https://doi.org/10.1038/nprot.2006.468" target="_blank" rel="noopener">doi:10.1038/nprot.2006.468</a>',
+ olsen:'Olsen JV, Ong SE, Mann M. Trypsin cleaves exclusively C-terminal to arginine and lysine residues. <i>Mol Cell Proteomics</i>. 2004;3(6):608–614. <a href="https://doi.org/10.1074/mcp.T400003-MCP200" target="_blank" rel="noopener">doi:10.1074/mcp.T400003-MCP200</a>',
+ steen:'Steen H, Mann M. The ABC\'s (and XYZ\'s) of peptide sequencing. <i>Nat Rev Mol Cell Biol</i>. 2004;5:699–711. <a href="https://doi.org/10.1038/nrm1468" target="_blank" rel="noopener">doi:10.1038/nrm1468</a>',
+ kyte:'Kyte J, Doolittle RF. A simple method for displaying the hydropathic character of a protein. <i>J Mol Biol</i>. 1982;157(1):105–132. <a href="https://doi.org/10.1016/0022-2836(82)90515-0" target="_blank" rel="noopener">doi:10.1016/0022-2836(82)90515-0</a>',
+ perkins:'Perkins DN, Pappin DJ, Creasy DM, Cottrell JS. Probability-based protein identification by searching sequence databases using mass spectrometry data. <i>Electrophoresis</i>. 1999;20(18):3551–3567. <a href="https://doi.org/10.1002/(SICI)1522-2683(19991201)20:18%3C3551::AID-ELPS3551%3E3.0.CO;2-2" target="_blank" rel="noopener">doi:10.1002/(SICI)1522-2683(19991201)20:18&lt;3551::AID-ELPS3551&gt;3.0.CO;2-2</a>',
+ uni:'UniProtKB Q9R0P9 · UCHL1_MOUSE, ubiquitin carboxyl-terminal hydrolase isozyme L1 (<i>Mus musculus</i>), 223 aa. <a href="https://www.uniprot.org/uniprotkb/Q9R0P9" target="_blank" rel="noopener">uniprot.org/uniprotkb/Q9R0P9</a>'
+};
+
+/* =============== Química =============== */
+const UCH="MQLKPMEINPEMLNKVLAKLGVAGQWRFADVLGLEEETLGSVPSPACALLLLFPLTAQHENFRKKQIEELKGQEVSPKVYFMKQTIGNSCGTIGLIHAVANNQDKLEFEDGSVLKQFLSETEKLSPEDRAKCFEKNEAIQAAHDSVAQEGQCRVDDKVNFHFILFNNVDGHLYELDGRMPFPVNHGASSEDSLLQDAAKVCREFTEREQGEVRFSAVALCKAA";
+const MONO={G:57.02146,A:71.03711,S:87.03203,P:97.05276,V:99.06841,T:101.04768,C:103.00919,L:113.08406,I:113.08406,N:114.04293,D:115.02694,Q:128.05858,K:128.09496,E:129.04259,M:131.04049,H:137.05891,F:147.06841,R:156.10111,Y:163.06333,W:186.07931};
+const AVG={G:57.0519,A:71.0788,S:87.0782,P:97.1167,V:99.1326,T:101.1051,C:103.1388,L:113.1594,I:113.1594,N:114.1038,D:115.0886,Q:128.1307,K:128.1741,E:129.1155,M:131.1926,H:137.1411,F:147.1766,R:156.1875,Y:163.1760,W:186.2132};
+const KD={A:1.8,R:-4.5,N:-3.5,D:-3.5,C:2.5,Q:-3.5,E:-3.5,G:-0.4,H:-3.2,I:4.5,L:3.8,K:-3.9,M:1.9,F:2.8,P:-1.6,S:-0.8,T:-0.7,W:-0.9,Y:-1.3,V:4.2};
+const H2O=18.01056,PROTON=1.007276,CAM=57.02146;
+const OX={di:{mono:31.98983,avg:31.9988,lbl:"Cys-SO₂H (dioxidación)",pka:2.0},tri:{mono:47.98474,avg:47.9982,lbl:"Cys-SO₃H (trioxidación)",pka:-1.0}};
+const PHOS={mono:79.96633,avg:79.9799};
+const PK={Nt:7.5,Ct:3.55,C:9.0,D:4.05,E:4.45,H:5.98,K:10.0,R:12.0,Y:10.0}; // Bjellqvist et al., 1993
+
+/* Proteoformas ilustrativas de UCH-L1 basadas en la Tabla II de Choi et al. (2018) */
+const PF=[
+ {spot:1,c90:null,c152:null,t85:false,txt:"Sin modificación de Cys"},
+ {spot:2,c90:"tri",c152:null,t85:false,txt:"Cys90 trioxidada"},
+ {spot:3,c90:"tri",c152:"di",t85:false,txt:"Cys90 trioxidada + Cys152 dioxidada"},
+ {spot:4,c90:"tri",c152:"tri",t85:true,txt:"Cys90 y Cys152 trioxidadas + pThr85"}
+];
+function charge(pH,pf){
+  let q=1/(1+10**(pH-PK.Nt))-1/(1+10**(PK.Ct-pH));
+  for(let i=0;i<UCH.length;i++){const c=UCH[i],pos=i+1;
+    if(c==="K"||c==="R"||c==="H")q+=1/(1+10**(pH-PK[c]));
+    else if(c==="D"||c==="E"||c==="Y")q-=1/(1+10**(PK[c]-pH));
+    else if(c==="C"){const o=pos===90?pf.c90:pos===152?pf.c152:null;
+      q-=o?1/(1+10**(OX[o].pka-pH)):1/(1+10**(PK.C-pH));}
+  }
+  if(pf.t85)q-=1/(1+10**(1.0-pH))+1/(1+10**(6.0-pH));
+  return q;
+}
+function pI(pf){let lo=0,hi=14;for(let k=0;k<60;k++){const m=(lo+hi)/2;if(charge(m,pf)>0)lo=m;else hi=m;}return (lo+hi)/2;}
+function avgMW(pf){let m=18.015;for(const c of UCH)m+=AVG[c];if(pf.c90)m+=OX[pf.c90].avg;if(pf.c152)m+=OX[pf.c152].avg;if(pf.t85)m+=PHOS.avg;return m;}
+PF.forEach(p=>{p.pI=pI(p);p.mw=avgMW(p);});
+const mz=(M,z)=>(M+z*PROTON)/z;
+
+/* =============== Estado =============== */
+const S={mod:1,mode:"guide",g:{1:0,2:0,3:0,4:0,5:0,6:0},
+ m1:{group:"d9",weight:25},
+ m2:{abs:0.62,dil:5,target:150},
+ m3:{phase:0,cond:"ctrl",range:"4-7",labels:true,sel:3},
+ m4:{day:"both",th:1.3,sort:"r9"},
+ m5:{pf:3,mc:1,sel:null}};
+const $=id=>document.getElementById(id);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function seeded(i){const x=Math.sin(i*12.9898+78.233)*43758.5453;return x-Math.floor(x);}
+const fmt=(v,d=2)=>Number(v).toFixed(d);
+
+/* =============== MÓDULO 1 · Modelo y tejido =============== */
+const M1={
+ title:"Modelo de estrés y obtención del hipocampo",short:"Estrés por restricción · Perfusión",
+ proto:"C57BL/6 machos de 6 semanas · restricción 2 h/día durante 9 o 14 días en tubo cónico de 50 mL · anestesia con Zoletil 50 (50 mg/kg) + Rompun (10 mg/kg) i.p. · perfusión transcardiaca con PBS-heparina (10 U/mL) · hipocampo a −80 °C.",
+ refs:["choi","gage"],
+ guide:[
+  {t:"Diseño experimental",s:{step:0},h:"Se asignan ratones C57BL/6 machos de 6 semanas al azar a control o a estrés crónico por restricción (CRS). Hay dos duraciones de estrés: 9 y 14 días. Los controles de ambas duraciones se combinan en un solo grupo control (n = 6), y cada grupo CRS tiene n = 3.",c:"Choi et al., 2018 (Experimental Procedures)"},
+  {t:"Estrés crónico por restricción",s:{step:1},h:"Cada día el ratón permanece 2 h dentro de un tubo cónico de 50 mL con orificios de ventilación y después regresa a su caja. Es un estresor psicológico repetido que se usa como modelo de conductas tipo depresivas.",c:"Choi et al., 2018"},
+  {t:"Anestesia y perfusión transcardiaca",s:{step:2},h:"El último día se anestesia al animal (Zoletil 50 + Rompun, i.p.) y se perfunde por el ventrículo izquierdo con PBS-heparina. Así se elimina la sangre del cerebro: la hemoglobina, la albúmina y las inmunoglobulinas del plasma contaminarían el proteoma del tejido.",f:"Dosis (mg) = dosis (mg/kg) × peso (kg)",c:"Choi et al., 2018; Gage et al., 2012",note:()=>dosNote()},
+  {t:"Disección y almacenamiento",s:{step:3},h:"Se disecan ambos hipocampos y se congelan a −80 °C hasta el análisis. La congelación rápida detiene la actividad de proteasas, fosfatasas y otras enzimas que alterarían las proteínas y sus modificaciones postraduccionales.",c:"Choi et al., 2018"}
+ ],
+ explore(){return `
+  <div class="field"><label for="m1g">Grupo resaltado</label>
+   <select id="m1g"><option value="ctrl">Control (n = 6)</option><option value="d9">CRS 9 días (n = 3)</option><option value="d14">CRS 14 días (n = 3)</option></select></div>
+  <div class="field"><label for="m1w">Peso del ratón: <b id="m1wv">${S.m1.weight}</b> g</label>
+   <input type="range" id="m1w" min="15" max="35" step="0.5" value="${S.m1.weight}"></div>
+  <div class="formula" id="m1dose"></div>
+  <p class="note">Concentraciones comerciales sin diluir: Zoletil 50 = 50 mg/mL (tiletamina + zolazepam); Rompun 2% = 20 mg/mL (xilacina). En la práctica se diluyen para medir volúmenes manejables; consulta el protocolo aprobado por tu comité de ética.</p>`;},
+ bindExplore(){$("m1g").value=S.m1.group;$("m1g").onchange=e=>{S.m1.group=e.target.value;M1.viz();};
+  $("m1w").oninput=e=>{S.m1.weight=+e.target.value;$("m1wv").textContent=S.m1.weight;updDose();};updDose();},
+ viz(st){
+  const step=st?st.step:-1;
+  const rows=[["ctrl","Control",0],["d9","CRS 9 días",9],["d14","CRS 14 días",14]];
+  let tl=`<div class="timeline"><div></div>${Array.from({length:14},(_,i)=>`<div class="d">D${i+1}</div>`).join("")}`;
+  rows.forEach(([k,n,d])=>{
+   const hl=S.mode==="explore"&&S.m1.group===k;
+   tl+=`<div class="g" style="${hl?"color:var(--accent)":""}">${n}</div>`;
+   for(let i=1;i<=14;i++){let cls="";if(d&&i<=d)cls="r";
+     if(k==="ctrl"&&(i===9||i===14))cls="x";if(d&&i===d)cls="r";
+     tl+=`<div class="c ${cls}" title="${cls==="r"?"Restricción 2 h":cls==="x"?"Sacrificio de 3 controles":"Sin manipulación"}"></div>`;}
+  });
+  tl+="</div>";
+  const cards=[["Diseño","Control n = 6 · CRS 9 d n = 3 · CRS 14 d n = 3"],["Restricción","2 h/día en tubo cónico de 50 mL"],["Perfusión","Zoletil 50 + Rompun i.p.; PBS-heparina 10 U/mL"],["Hipocampo","Disección y almacenamiento a −80 °C"]];
+  $("viz").innerHTML=`
+   <div class="panel"><div class="row" style="justify-content:space-between"><h3>Calendario del experimento</h3><span class="note">Cada celda es un día</span></div>
+    <div class="tl-wrap"><div class="tl-inner">${tl}</div></div>
+    <div class="legend" style="border:0;padding:0"><span><i style="background:color-mix(in srgb,var(--accent) 55%,transparent);border-radius:2px"></i>Restricción 2 h</span><span><i style="background:var(--cut);border-radius:2px"></i>Sacrificio de 3 controles (días 9 y 14)</span><span>Los grupos CRS se sacrifican al terminar su último día de estrés.</span></div>
+   </div>
+   <div class="steps">${cards.map((c,i)=>`<div class="stepcard ${i===step?"on":""}"><span class="eyebrow">Paso ${i+1}</span><b>${c[0]}</b><span>${c[1]}</span></div>`).join("")}</div>
+   <div class="stats three"><div class="stat"><b>12</b><span>ratones en total</span></div><div class="stat"><b>${S.m1.weight} g</b><span>peso de ejemplo</span></div><div class="stat"><b>${fmt(S.m1.weight*0.05,2)} mg</b><span>Zoletil para este peso</span></div></div>`;
+ },
+ quiz(){return [
+  {q:"¿Por qué se perfunde al animal con PBS-heparina antes de extraer el hipocampo?",o:["Para eliminar la sangre, cuyas proteínas (hemoglobina, albúmina) contaminarían el proteoma del tejido","Para fijar el tejido y preservar su morfología","Para aumentar la concentración de proteína en el hipocampo","Para inducir la oxidación de las cisteínas"],a:0,x:"La perfusión lava el lecho vascular; la heparina evita la coagulación. Aun así, la albúmina (ALBU) aparece en la Tabla I de Choi et al., lo que recuerda que la remoción nunca es total."},
+  {q:"En el diseño de Choi et al. (2018), ¿cuántos animales tiene el grupo control y por qué?",o:["6, porque combinan 3 controles del día 9 y 3 del día 14","3, igual que cada grupo de estrés","12, uno por cada día de estrés","9, tres por cada punto temporal"],a:0,x:"Los controles de ambos tiempos se combinan (n = 6); cada grupo CRS tiene n = 3."},
+  {q:`Un ratón pesa ${S.m1.weight} g. ¿Cuánta xilacina (Rompun, 10 mg/kg) recibe?`,o:[fmt(S.m1.weight*0.01,2)+" mg",fmt(S.m1.weight*0.1,2)+" mg",fmt(S.m1.weight*0.05,2)+" mg",fmt(S.m1.weight*10,0)+" mg"],a:0,x:`10 mg/kg × ${fmt(S.m1.weight/1000,4)} kg = ${fmt(S.m1.weight*0.01,2)} mg. Hay que convertir gramos a kilogramos.`},
+  {q:"¿Por qué se congela el hipocampo a −80 °C?",o:["Para detener proteasas y fosfatasas y conservar las proteínas y sus modificaciones","Para facilitar la disección","Para desnaturalizar las proteínas antes del IEF","Para oxidar las cisteínas de forma controlada"],a:0,x:"La baja temperatura detiene la actividad enzimática que degradaría o modificaría las proteínas."}
+ ];}
+};
+function dosNote(){return `Para un ratón de ${S.m1.weight} g: Zoletil ${fmt(S.m1.weight*0.05,2)} mg y xilacina ${fmt(S.m1.weight*0.01,2)} mg.`;}
+function updDose(){const w=S.m1.weight/1000;$("m1dose").innerHTML=`Zoletil: 50 mg/kg × ${fmt(w,4)} kg = <b>${fmt(50*w,2)} mg</b> → ${fmt(50*w/50*1000,0)} µL de stock<br>Xilacina: 10 mg/kg × ${fmt(w,4)} kg = <b>${fmt(10*w,2)} mg</b> → ${fmt(10*w/20*1000,1)} µL de stock`;M1.viz();}
+
+/* =============== MÓDULO 2 · Lisis, BCA, precipitación =============== */
+const BUFFER=[
+ ["HEPES pH 7.4","20 mM","Amortiguador: mantiene el pH fisiológico durante la extracción."],
+ ["NaCl","50 mM","Fuerza iónica; reduce interacciones inespecíficas."],
+ ["KCl","40 mM","Fuerza iónica, similar al medio intracelular."],
+ ["Triton X-100","1%","Detergente no iónico: solubiliza membranas y libera proteínas."],
+ ["Glicerol","10%","Estabiliza proteínas en solución."],
+ ["Mezcla de inhibidores de proteasas","0.5%","Inhibe proteasas de amplio espectro."],
+ ["Na₃VO₄","2.5 mM","Inhibe tirosina-fosfatasas; conserva fosforilaciones."],
+ ["Tricostatina A","5 mM*","Inhibe desacetilasas de histonas (HDAC); conserva acetilaciones."],
+ ["Butirato de sodio","5 mM","Inhibidor de HDAC; conserva acetilaciones."],
+ ["PMSF","1 mM","Inhibe serín-proteasas."],
+ ["EDTA","1 mM","Quela metales; inhibe metaloproteasas."]
+];
+const STD=[0,25,125,250,500,750,1000,1500,2000];
+const absOf=c=>0.095+0.00102*c-1.1e-7*c*c;
+function bcaFit(){const x=STD,y=STD.map(absOf),n=x.length;const mx=x.reduce((a,b)=>a+b)/n,my=y.reduce((a,b)=>a+b)/n;
+ let sxy=0,sxx=0,syy=0;x.forEach((v,i)=>{sxy+=(v-mx)*(y[i]-my);sxx+=(v-mx)**2;syy+=(y[i]-my)**2;});
+ const m=sxy/sxx,b=my-m*mx;return {m,b,r2:(sxy*sxy)/(sxx*syy)};}
+const M2={
+ title:"Lisis, cuantificación y precipitación",short:"Buffer · BCA · Acetona-DTT",
+ proto:"Molienda en N₂ líquido · lisis en HEPES 20 mM, NaCl 50 mM, KCl 40 mM, Triton X-100 1%, glicerol 10% e inhibidores · 2 centrifugaciones a 20 000 × g, 30 min, 4 °C · BCA · precipitación con acetona + DTT 1% (−20 °C, 1 h; 10 000 × g, 5 min) · 150 µg por gel.",
+ refs:["choi","smith","gorg"],
+ guide:[
+  {t:"Lisis del tejido",s:{hl:[0,1,2,3,4]},h:"El hipocampo congelado se muele en nitrógeno líquido y se homogeniza en el buffer de lisis. El Triton X-100 rompe las membranas; HEPES y las sales mantienen un ambiente estable.",c:"Choi et al., 2018"},
+  {t:"Inhibidores: proteger el proteoma",s:{hl:[5,6,7,8,9,10]},h:"Al romper la célula se liberan enzimas que degradan proteínas o eliminan modificaciones. El buffer combina inhibidores de proteasas (cóctel, PMSF, EDTA), de fosfatasas (vanadato) y de desacetilasas (tricostatina A, butirato).",c:"Choi et al., 2018"},
+  {t:"Clarificación por centrifugación",s:{hl:[]},h:"El lisado se centrifuga a 20 000 × g durante 30 min a 4 °C y el sobrenadante se vuelve a centrifugar en las mismas condiciones. Se conserva el sobrenadante: la fracción de proteínas solubles.",c:"Choi et al., 2018"},
+  {t:"Cuantificación por BCA",s:{hl:[],bca:true},h:"En medio alcalino las proteínas reducen Cu²⁺ a Cu⁺, que forma un complejo púrpura con el ácido bicinconínico (absorbe a 562 nm). Con una curva de BSA se interpola la concentración de la muestra para cargar 150 µg por gel.",f:"C = (A₅₆₂ − b) / m × factor de dilución",c:"Smith et al., 1985; Choi et al., 2018",note:()=>bcaNote()},
+  {t:"Precipitación con acetona",s:{hl:[],bca:true},h:"Las proteínas se precipitan con acetona fría con DTT 1% (−20 °C, 1 h) y se recuperan a 10 000 × g. Así se eliminan sales, detergente y otros contaminantes que interfieren con el isoelectroenfoque. Después se redisuelven 2 h a temperatura ambiente.",c:"Choi et al., 2018; Görg et al., 2004"}
+ ],
+ explore(){return `
+  <div class="field"><label for="m2a">Absorbancia de la muestra (A₅₆₂): <b id="m2av">${fmt(S.m2.abs,3)}</b></label><input type="range" id="m2a" min="0.15" max="2.2" step="0.005" value="${S.m2.abs}"></div>
+  <div class="field"><label for="m2d">Factor de dilución de la muestra</label><select id="m2d">${[1,2,5,10,20].map(v=>`<option value="${v}">1:${v}</option>`).join("")}</select></div>
+  <div class="field"><label for="m2t">Proteína a cargar por gel (µg)</label><input type="number" id="m2t" min="10" max="1000" value="${S.m2.target}"></div>
+  <p class="note">La curva de calibración usa los estándares de BSA de 0 a 2000 µg/mL. Las absorbancias de los estándares son simuladas, con la ligera curvatura típica del ensayo.</p>`;},
+ bindExplore(){$("m2d").value=String(S.m2.dil);
+  $("m2a").oninput=e=>{S.m2.abs=+e.target.value;$("m2av").textContent=fmt(S.m2.abs,3);M2.viz({bca:true,hl:[]});};
+  $("m2d").onchange=e=>{S.m2.dil=+e.target.value;M2.viz({bca:true,hl:[]});};
+  $("m2t").oninput=e=>{const v=+e.target.value;if(v>0){S.m2.target=v;M2.viz({bca:true,hl:[]});}};},
+ viz(st){
+  st=st||{hl:[],bca:true};
+  const F=bcaFit(),cw=(S.m2.abs-F.b)/F.m,conc=cw*S.m2.dil,ugul=conc/1000,vol=S.m2.target/ugul;
+  const inRange=S.m2.abs>=absOf(0)&&S.m2.abs<=absOf(2000);
+  // gráfica
+  const W=520,H=260,L=48,R=16,T=14,B=36,xm=c=>L+(c/2000)*(W-L-R),ym=a=>T+(1-(a/2.4))*(H-T-B);
+  let g=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Curva de calibración BCA">`;
+  [0,0.4,0.8,1.2,1.6,2.0,2.4].forEach(a=>{g+=`<line class="grid" x1="${L}" x2="${W-R}" y1="${ym(a)}" y2="${ym(a)}"/><text x="${L-6}" y="${ym(a)+4}" text-anchor="end">${a.toFixed(1)}</text>`;});
+  [0,500,1000,1500,2000].forEach(c=>{g+=`<text x="${xm(c)}" y="${H-B+16}" text-anchor="middle">${c}</text>`;});
+  g+=`<line class="axis" x1="${L}" x2="${W-R}" y1="${ym(0)}" y2="${ym(0)}"/><line class="axis" x1="${L}" x2="${L}" y1="${T}" y2="${ym(0)}"/>`;
+  g+=`<text x="${(L+W-R)/2}" y="${H-4}" text-anchor="middle">BSA (µg/mL)</text><text x="12" y="${T+90}" transform="rotate(-90 12 ${T+90})" text-anchor="middle">A₅₆₂</text>`;
+  g+=`<line x1="${xm(0)}" y1="${ym(F.b)}" x2="${xm(2000)}" y2="${ym(F.b+F.m*2000)}" stroke="var(--accent)" stroke-width="2"/>`;
+  STD.forEach(c=>{g+=`<circle cx="${xm(c)}" cy="${ym(absOf(c))}" r="4.5" fill="var(--surface)" stroke="var(--accent)" stroke-width="2"/>`;});
+  if(st.bca){const cx=Math.max(0,Math.min(2000,cw));
+   g+=`<line x1="${L}" x2="${xm(cx)}" y1="${ym(S.m2.abs)}" y2="${ym(S.m2.abs)}" stroke="var(--cut)" stroke-dasharray="4 3"/><line x1="${xm(cx)}" x2="${xm(cx)}" y1="${ym(S.m2.abs)}" y2="${ym(0)}" stroke="var(--cut)" stroke-dasharray="4 3"/><circle cx="${xm(cx)}" cy="${ym(S.m2.abs)}" r="6" fill="var(--cut)"/>`;}
+  g+=`</svg>`;
+  $("viz").innerHTML=`
+   <div class="panel"><h3>Buffer de lisis (Choi et al., 2018)</h3>
+    <div class="tbl-wrap" style="max-height:none"><table><thead><tr><th>Componente</th><th class="num">Conc.</th><th>Función</th></tr></thead><tbody>
+    ${BUFFER.map((r,i)=>`<tr class="${st.hl&&st.hl.includes(i)?"hl":""}"><td>${r[0]}</td><td class="num">${r[1]}</td><td class="wrap">${r[2]}</td></tr>`).join("")}</tbody></table></div>
+    <p class="note">* Valor tal como aparece en el artículo. La tricostatina A suele usarse en concentraciones nanomolares a micromolares; conviene verificar este dato antes de preparar el buffer.</p></div>
+   <div class="panel"><div class="row" style="justify-content:space-between"><h3>Curva de calibración BCA</h3><span class="note">y = ${fmt(F.m,5)}x + ${fmt(F.b,4)} · R² = ${fmt(F.r2,4)}</span></div>${g}
+    ${inRange?"":`<p class="warn">La absorbancia está fuera del intervalo de los estándares: diluye la muestra y repite la lectura.</p>`}</div>
+   <div class="stats"><div class="stat"><b>${fmt(Math.max(cw,0),0)}</b><span>µg/mL en la cubeta</span></div><div class="stat"><b>${fmt(Math.max(ugul,0),2)}</b><span>µg/µL en el lisado (×${S.m2.dil})</span></div><div class="stat"><b>${ugul>0?fmt(vol,1):"–"}</b><span>µL para ${S.m2.target} µg</span></div><div class="stat"><b>×2</b><span>centrifugaciones a 20 000 × g</span></div></div>`;
+ },
+ quiz(){const F=bcaFit(),A=+(0.45+seeded(Date.now()%97)*0.9).toFixed(3),d=10,c=(A-F.b)/F.m*d/1000,v=150/c;
+  return [
+  {q:"¿Qué función cumple el ortovanadato de sodio (Na₃VO₄) en el buffer de lisis?",o:["Inhibe tirosina-fosfatasas y conserva las fosforilaciones","Solubiliza las membranas","Quela metales divalentes","Reduce los puentes disulfuro"],a:0,x:"El vanadato imita al fosfato y bloquea fosfatasas; así se conservan fosforilaciones como la pThr85 de UCH-L1 que reportan Choi et al."},
+  {q:`Una muestra diluida 1:${d} da A₅₆₂ = ${A}. Con la curva y = ${fmt(F.m,5)}x + ${fmt(F.b,4)}, ¿qué volumen del lisado contiene 150 µg?`,o:[fmt(v,1)+" µL",fmt(v*d,1)+" µL",fmt(v/d,2)+" µL",fmt(150/((A)/F.m*d/1000),1)+" µL"],a:0,x:`C = (${A} − ${fmt(F.b,4)}) / ${fmt(F.m,5)} × ${d} = ${fmt(c*1000,0)} µg/mL = ${fmt(c,3)} µg/µL; V = 150 / ${fmt(c,3)} = ${fmt(v,1)} µL.`},
+  {q:"¿Por qué se precipitan las proteínas con acetona antes del isoelectroenfoque?",o:["Para eliminar sales y detergentes que interfieren con el IEF","Para separar las proteínas por tamaño","Para oxidar las cisteínas","Para digerir las proteínas"],a:0,x:"Las sales aumentan la conductividad y distorsionan el enfoque; la precipitación limpia la muestra (Görg et al., 2004)."},
+  {q:"Tras las dos centrifugaciones a 20 000 × g, ¿qué fracción se conserva?",o:["El sobrenadante, con las proteínas solubles","El precipitado, con núcleos y membranas","Ambas fracciones mezcladas","Ninguna; se descarta todo y se usa el homogenado"],a:0,x:"El sobrenadante contiene la fracción soluble que se cuantifica y se analiza en 2D-PAGE."}
+ ];}
+};
+function bcaNote(){const F=bcaFit(),cw=(S.m2.abs-F.b)/F.m,u=cw*S.m2.dil/1000;return `Ejemplo: A₅₆₂ = ${fmt(S.m2.abs,3)}, dilución 1:${S.m2.dil} → ${fmt(u,2)} µg/µL; para ${S.m2.target} µg se cargan ${fmt(S.m2.target/u,1)} µL.`;}
+
+/* =============== MÓDULO 3 · 2D-PAGE =============== */
+const INT={ctrl:[1.0,0.7,0.35,0.15],d9:[0.55,0.45,0.85,0.55],d14:[0.75,0.6,0.6,0.35]};
+const BG=Array.from({length:80},(_,i)=>{const pi=4.15+seeded(i)*2.8,mw=10**(1.05+seeded(i+200)*1.1);return {pi,mw,base:0.25+seeded(i+400)*0.8,v9:1+(seeded(i+600)-.5)*.3,v14:1+(seeded(i+800)-.5)*.3};})
+ .filter(b=>!(b.pi>4.75&&b.pi<5.3&&b.mw>21&&b.mw<29));
+const M3={
+ title:"Electroforesis bidimensional (2D-PAGE)",short:"IEF pH 4–7 · SDS-PAGE · Plata",
+ proto:"150 µg por tira IPG de 18 cm, pH 4–7 (Ettan IPGphor II) · equilibrado 1: Tris-HCl 50 mM pH 8.8, urea 6 M, SDS 2%, glicerol 30%, DTT 65 mM · equilibrado 2: mismo buffer con yodoacetamida 2.5% · SDS-PAGE (PROTEAN II xi) · tinción con plata de todos los geles en una misma charola.",
+ refs:["choi","gorg","bjell","laem","silver","uni"],
+ guide:[
+  {t:"Primera dimensión: isoelectroenfoque",s:{phase:0},h:"La muestra se carga en una tira con gradiente de pH inmovilizado (4–7). Bajo el campo eléctrico, cada proteína migra hasta el pH en que su carga neta es cero: su punto isoeléctrico (pI). Observa cómo las cuatro proteoformas de UCH-L1 se detienen en posiciones distintas.",f:"q(pH) = Σ cargas de grupos ionizables; en el pI, q = 0",c:"Görg et al., 2004; Bjellqvist et al., 1993",note:()=>`pI calculado de UCH-L1 sin modificar: ${fmt(PF[0].pI,2)} (Choi et al. reportan 5.14).`},
+  {t:"Equilibrado 1: reducción con DTT",s:{phase:1},h:"La tira se incuba en buffer con urea 6 M, SDS 2%, glicerol 30% y DTT 65 mM. El SDS recubre a las proteínas de carga negativa y el DTT reduce los puentes disulfuro.",c:"Choi et al., 2018; Görg et al., 2004"},
+  {t:"Equilibrado 2: alquilación con yodoacetamida",s:{phase:2},h:"La yodoacetamida (2.5%) carbamidometila los tioles libres (+57.021 Da). Clave para este estudio: una cisteína ya oxidada a ácido sulfínico o sulfónico no tiene tiol libre y no se alquila. Esa diferencia se detectará después por espectrometría de masas.",c:"Choi et al., 2018"},
+  {t:"Segunda dimensión: SDS-PAGE",s:{phase:3},h:"La tira se coloca sobre un gel de poliacrilamida. Recubiertas de SDS, las proteínas migran según su masa molecular: las pequeñas avanzan más. UCH-L1 (~24.8 kDa) queda en la zona baja del gel.",f:"Movilidad relativa ∝ −log₁₀(MW)",c:"Laemmli, 1970; Choi et al., 2018"},
+  {t:"Tinción con plata",s:{phase:4},h:"La plata se une a las proteínas y se reduce a plata metálica, revelando spots de color pardo. Es muy sensible (nanogramos). Choi et al. tiñeron todos los geles juntos en una charola para que la intensidad fuera comparable.",c:"Chevallet et al., 2006; Choi et al., 2018"},
+  {t:"El estrés desplaza a UCH-L1 hacia el lado ácido",s:{phase:5,cond:"d9"},h:"Cada oxidación de Cys a –SO₂H o –SO₃H añade una carga negativa permanente, y la fosforilación añade más. El pI baja y el spot se desplaza a la izquierda. En CRS de 9 días disminuyen los spots 1 y 2 y aumentan los spots 3 y 4; a los 14 días el cambio se revierte en parte.",c:"Choi et al., 2018 (Tabla II, Figs. 3–4)",note:()=>`pI calculados: ${PF.map(p=>"spot "+p.spot+" = "+fmt(p.pI,2)).join(" · ")}.`}
+ ],
+ explore(){return `
+  <div class="field"><label for="m3c">Condición</label><select id="m3c"><option value="ctrl">Control</option><option value="d9">CRS 9 días</option><option value="d14">CRS 14 días</option></select></div>
+  <div class="field"><label for="m3r">Intervalo de pH de la tira IPG</label><select id="m3r"><option value="4-7">pH 4–7 (protocolo)</option><option value="3-10">pH 3–10</option></select></div>
+  <label class="chk"><input type="checkbox" id="m3l" ${S.m3.labels?"checked":""}> <span>Mostrar etiquetas de UCH-L1</span></label>
+  <p class="note">Compara las dos tiras: con pH 3–10 las proteoformas de UCH-L1 quedan más juntas. Un intervalo estrecho mejora la resolución en esa zona.</p>
+  <p class="note">Haz clic en una fila de la tabla para resaltar ese spot.</p>`;},
+ bindExplore(){$("m3c").value=S.m3.cond;$("m3r").value=S.m3.range;
+  $("m3c").onchange=e=>{S.m3.cond=e.target.value;M3.table();};
+  $("m3r").onchange=e=>{S.m3.range=e.target.value;gel.retarget();};
+  $("m3l").onchange=e=>{S.m3.labels=e.target.checked;};},
+ viz(st){
+  if(st){S.m3.phase=st.phase;if(st.cond)S.m3.cond=st.cond;else if(S.mode==="guide")S.m3.cond="ctrl";}
+  if(!$("gelcv")){
+   $("viz").innerHTML=`<div class="canvas-box"><canvas id="gelcv" aria-label="Gel bidimensional simulado"></canvas><div class="stage-tag" id="gelTag"></div>
+    <div class="legend"><span><i style="background:var(--cys)"></i>Proteoformas de UCH-L1 (pI calculado desde la secuencia)</span><span><i style="background:var(--muted)"></i>Spots de fondo (posiciones ilustrativas)</span></div></div>
+    <div class="tbl-wrap" style="max-height:none"><table><thead><tr><th>Spot</th><th>Modificaciones</th><th class="num">pI calc.</th><th class="num">MW (Da)</th><th class="num">Intensidad rel.</th></tr></thead><tbody id="pfBody"></tbody></table></div>
+    <p class="note">Las modificaciones por spot son una combinación ilustrativa de las reportadas en la Tabla II de Choi et al. (Cys90 y Cys152 di-/trioxidadas, pThr85). Las intensidades relativas reproducen la tendencia descrita, no valores medidos.</p>`;
+   gel.init();
+  }
+  if(S.m3.phase===0)gel.resetIEF();
+  gel.retarget();M3.table();
+ },
+ table(){const I=INT[S.m3.cond];
+  $("pfBody").innerHTML=PF.map((p,i)=>`<tr class="click ${S.m3.sel===i?"hl":""}" data-i="${i}"><td><b>${p.spot}</b></td><td class="wrap">${pfTags(p)}</td><td class="num">${fmt(p.pI,2)}</td><td class="num">${fmt(p.mw,1)}</td><td class="num">${S.m3.phase>=4?fmt(I[i],2):"–"}</td></tr>`).join("");
+  document.querySelectorAll("#pfBody tr").forEach(tr=>tr.onclick=()=>{S.m3.sel=+tr.dataset.i;M3.table();});},
+ quiz(){return [
+  {q:"¿Por qué la proteoforma de UCH-L1 con Cys90 y Cys152 oxidadas a ácido sulfónico se desplaza hacia el extremo ácido del gel?",o:["Porque cada –SO₃H está ionizado a cualquier pH del gradiente y añade carga negativa, lo que baja el pI","Porque la oxidación aumenta la masa y la proteína migra menos","Porque la oxidación elimina residuos de lisina","Porque la yodoacetamida añade carga positiva a las cisteínas oxidadas"],a:0,x:`El ácido sulfónico (pKa < 0) siempre está desprotonado. pI calculado: ${fmt(PF[0].pI,2)} sin modificar vs ${fmt(PF[3].pI,2)} con ambas Cys trioxidadas y pThr85.`},
+  {q:"¿Qué separa cada dimensión del gel 2D?",o:["1.ª dimensión: punto isoeléctrico; 2.ª: masa molecular","1.ª: masa molecular; 2.ª: punto isoeléctrico","Ambas separan por hidrofobicidad","1.ª: carga neta a pH 7; 2.ª: abundancia"],a:0,x:"IEF en tira IPG y después SDS-PAGE (Görg et al., 2004)."},
+  {q:"Durante el equilibrado con yodoacetamida, ¿qué ocurre con una Cys ya oxidada a ácido sulfínico (–SO₂H)?",o:["No se alquila, porque ya no tiene tiol libre","Se carbamidometila igual que una Cys reducida","Se reduce de nuevo a tiol","Se convierte en serina"],a:0,x:"Solo los tioles libres reaccionan. Por eso en MS la Cys oxidada lleva +31.990 Da en lugar de +57.021 Da."},
+  {q:"¿Por qué Choi et al. usaron tiras de pH 4–7 y no de 3–10?",o:["Para aumentar la resolución en la zona donde enfoca la mayoría de las proteínas citosólicas, incluida UCH-L1 (pI ≈ 5.1)","Porque las tiras de 3–10 no existen en 18 cm","Para separar mejor las proteínas básicas","Porque así se evita la tinción con plata"],a:0,x:"Un intervalo estrecho distribuye los mismos centímetros en menos unidades de pH, así que proteoformas con pI cercanos se separan mejor."}
+ ];}
+};
+function pfTags(p){const t=[];if(p.c90)t.push(`<span class="pill ox">Cys90 ${p.c90==="tri"?"-SO₃H":"-SO₂H"}</span>`);if(p.c152)t.push(`<span class="pill ox">Cys152 ${p.c152==="tri"?"-SO₃H":"-SO₂H"}</span>`);if(p.t85)t.push(`<span class="pill ph">pThr85</span>`);return t.length?t.join(" "):'<span class="note">Ninguna</span>';}
+
+const gel={cv:null,ctx:null,W:0,H:0,spots:[],tIEF:0,
+ init(){this.cv=$("gelcv");this.ctx=this.cv.getContext("2d");
+  this.spots=[...PF.map((p,i)=>({u:true,i,pi:p.pI,mw:p.mw/1000,x:0,y:0})),...BG.map((b,i)=>({u:false,i,pi:b.pi,mw:b.mw,b,x:0,y:0}))];
+  new ResizeObserver(()=>this.resize()).observe(this.cv);this.resize();this.resetIEF();
+  this.cv.onclick=e=>{const r=this.cv.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;
+   this.spots.filter(s=>s.u).forEach(s=>{if(Math.hypot(s.x-mx,s.y-my)<14){S.m3.sel=s.i;M3.table();}});};
+  if(!this.loop){this.loop=true;requestAnimationFrame(t=>this.draw(t));}},
+ resize(){if(!this.cv)return;const r=this.cv.getBoundingClientRect(),d=devicePixelRatio||1;this.W=r.width;this.H=r.height;this.cv.width=this.W*d;this.cv.height=this.H*d;this.ctx.setTransform(d,0,0,d,0,0);this.retarget(true);},
+ geo(){const L=58,R=18,top=62,bot=this.H-34;const [a,b]=S.m3.range==="4-7"?[4,7]:[3,10];
+  return {L,R,top,bot,a,b,x:pi=>L+(pi-a)/(b-a)*(this.W-L-R),y:mw=>top+(Math.log10(150)-Math.log10(mw))/(Math.log10(150)-Math.log10(10))*(bot-top),strip:38};},
+ resetIEF(){const G=this.geo();this.tIEF=performance.now();this.spots.forEach(s=>{s.x=G.L+seeded(s.i*3+(s.u?900:0))*(this.W-G.L-G.R);s.y=G.strip;});},
+ retarget(snap){const G=this.geo();this.spots.forEach(s=>{s.tx=G.x(s.pi);s.ty=S.m3.phase>=3?G.y(s.mw):G.strip;if(snap){s.x=s.tx;s.y=s.ty;}});},
+ draw(now){if(!this.cv||!document.body.contains(this.cv)){this.loop=false;return;}
+  const c=this.ctx,W=this.W,H=this.H,G=this.geo(),ph=S.m3.phase,red=matchMedia("(prefers-reduced-motion: reduce)").matches;
+  c.clearRect(0,0,W,H);
+  // gel
+  if(ph>=3){c.fillStyle=css("--gel");c.fillRect(G.L,G.top-6,W-G.L-G.R,G.bot-G.top+10);}
+  // tira IPG
+  const sc=ph===1?"#b9d3f0":ph===2?"#7d9fe0":css("--line");
+  c.fillStyle=sc;c.fillRect(G.L,G.strip-8,W-G.L-G.R,16);
+  // ejes
+  c.fillStyle=css("--muted");c.font=`11px ${css("--f-mono")}`;c.textAlign="center";
+  for(let p=G.a;p<=G.b;p+=(G.b-G.a>4?1:0.5)){const x=G.x(p);c.fillText(p.toFixed(p%1?1:0),x,18);c.fillRect(x,22,1,6);}
+  c.textAlign="left";c.fillText("pH",6,18);c.fillText("−",G.L-12,G.strip+4);c.fillText("+",W-G.R+4,G.strip+4);
+  if(ph>=3){c.textAlign="right";[150,100,75,50,37,25,20,15,10].forEach(m=>{const y=G.y(m);c.fillText(m,G.L-8,y+4);c.fillRect(G.L-5,y,4,1);});
+   c.save();c.translate(14,(G.top+G.bot)/2);c.rotate(-Math.PI/2);c.textAlign="center";c.fillText("kDa",0,0);c.restore();}
+  // spots
+  const k=red?1:(ph===0?0.035:0.08),I=INT[S.m3.cond];
+  this.spots.forEach(s=>{
+   s.x+=(s.tx-s.x)*k;s.y+=(s.ty-s.y)*k;
+   const off=s.pi<G.a||s.pi>G.b;if(off)return;
+   let inten=s.u?I[s.i]:s.b.base*(S.m3.cond==="d9"?s.b.v9:S.m3.cond==="d14"?s.b.v14:1);
+   const r=(ph>=3?4:3)+Math.sqrt(inten)*(ph>=3?6:3);
+   if(ph<4){c.globalAlpha=s.u?0.95:0.35;c.fillStyle=s.u?css("--cys"):css("--muted");
+     c.beginPath();c.ellipse(s.x,s.y,r*0.7,ph>=3?r*0.55:4,0,0,Math.PI*2);c.fill();}
+   else{const grd=c.createRadialGradient(s.x,s.y,0,s.x,s.y,r);const a=Math.min(0.9,0.25+inten*0.7);
+     grd.addColorStop(0,`rgba(59,46,34,${a})`);grd.addColorStop(1,"rgba(59,46,34,0)");
+     c.globalAlpha=1;c.fillStyle=grd;c.beginPath();c.ellipse(s.x,s.y,r*1.2,r*0.9,0,0,Math.PI*2);c.fill();
+     if(s.u){c.strokeStyle=css("--cys");c.lineWidth=S.m3.sel===s.i?2.5:1.2;c.beginPath();c.ellipse(s.x,s.y,r*1.25+3,r*0.95+3,0,0,Math.PI*2);c.stroke();}}
+   if(s.u&&S.m3.labels&&ph>=3){c.globalAlpha=1;c.fillStyle="#1b2130";c.font=`600 11px ${css("--f-mono")}`;c.textAlign="center";c.fillText(String(s.i+1),s.x,s.y-r-8);}
+  });
+  c.globalAlpha=1;
+  if(S.m3.labels&&ph>=3){const xs=PF.map(p=>G.x(p.pI));const y=G.y(PF[0].mw/1000);c.fillStyle="#1b2130";c.font=`600 12px ${css("--f-body")}`;c.textAlign="left";c.fillText("UCH-L1",Math.max(...xs)+18,y+4);}
+  const tags=["1.ª dimensión · IEF","Equilibrado 1 · DTT","Equilibrado 2 · Yodoacetamida","2.ª dimensión · SDS-PAGE","Tinción con plata","Comparación · "+({ctrl:"Control",d9:"CRS 9 días",d14:"CRS 14 días"})[S.m3.cond]];
+  const tg=$("gelTag");if(tg)tg.textContent=tags[ph]+(ph>=4&&ph<5?" · "+({ctrl:"Control",d9:"CRS 9 días",d14:"CRS 14 días"})[S.m3.cond]:"");
+  requestAnimationFrame(t=>this.draw(t));}
+};
+
+/* =============== MÓDULO 4 · Análisis de imagen =============== */
+const T1=[["SCRN1","Q9CZC8",null,-2.00,-2.21],["CNDP2","Q9D1A2",2,-1.59,1.21],["CNDP2","Q9D1A2",3,-2.52,1.21],["CNDP2","Q9D1A2",30,1.38,1.46],["IF5A1","P63242",19,-2.81,-2.50],["IF5A1","P63242",63,4.70,3.11],["CH60","P63038",null,1.92,1.32],["PSD11","Q8BG32",null,1.31,1.21],["OTUB1","Q7TQI3",null,1.31,1.79],["UBE2K","P61087",null,1.49,1.28],["VATB2","P62814",null,3.99,4.70],["LDHB","P16125",null,2.31,2.51],["PGAM1","Q9DBJ1",null,1.32,1.29],["TPIS","P17751",null,2.11,2.33],["PDXK","Q8K183",null,4.21,3.02],["ATPD","Q9D3D9",null,-1.19,-1.32],["NDUS3","Q9DCT2",null,2.01,1.89],["HDHD2","Q3UGR5",9,-2.39,-3.21],["HDHD2","Q3UGR5",52,3.11,3.30],["PGP","Q8CHP8",null,1.80,-1.57],["CAZA2","P47754",7,-1.92,-2.21],["CAZA2","P47754",48,2.71,3.33],["GDIB","Q61598",31,1.99,1.31],["GDIB","Q61598",32,2.71,1.70],["SNAB","P28663",null,1.43,1.23],["PA1B2","Q61206",null,-1.41,-1.09],["GNAO","P18872",5,-3.21,-1.79],["GNAO","P18872",6,-3.41,-1.23],["GNAO","P18872",41,2.88,2.01],["MK01","P63085",null,2.22,2.49],["GBB1","P62874",null,1.72,1.98],["ARPC5","Q9CPW4",18,-2.70,-2.72],["ARPC5","Q9CPW4",62,2.79,2.11],["CANB1","Q63810",null,-1.49,-1.10],["DPYL2","O08553",25,2.35,4.02],["DPYL2","O08553",26,1.70,2.41],["COR1A","O89053",null,3.22,2.28],["GUAD","Q9R111",null,1.77,1.29],["ACTB","P60710",35,2.83,2.41],["ACTB","P60710",37,3.12,2.77],["ACTG","P63260",null,2.77,2.50],["ARP2","P61161",39,2.22,2.59],["ARP2","P61161",40,1.89,1.47],["CNPY2","Q9QXT0",null,1.81,1.55],["KCRB","Q04447",null,-4.21,1.02],["HPCA","P84075",null,-1.51,-1.30],["PP2BA","P63328",null,2.81,2.71],["NCALD","Q91X97",null,1.77,-1.02],["UCHL1","Q9R0P9",11,-2.02,-1.75],["UCHL1","Q9R0P9",54,3.63,1.76],["SYUB","Q91ZZ3",null,-1.91,-1.42],["SYUA","O55042",null,-1.19,-1.47],["SEPT5","Q9Z2Q6",null,1.32,1.30],["CRYM","O54983",null,-1.30,-1.19],["PRDX2","Q61171",14,-2.70,-4.21],["PRDX2","Q61171",59,1.69,1.88],["DLDH","O08749",null,3.69,1.19],["ALBU","P07724",22,2.71,1.99],["ALBU","P07724",23,1.79,1.42],["1433T","P68254",null,-2.53,-2.33],["TCTP","P63028",13,-1.21,-1.42],["TCTP","P63028",58,2.12,1.59],["1433E","P62259",null,1.72,1.61]];
+const M4={
+ title:"Análisis de imagen y selección de spots",short:"SameSpots · ≥ 1.3 veces · p < 0.05",
+ proto:"Escaneo (Image Scanner III) · Progenesis SameSpots 5.0: alineación, normalización, detección y cuantificación · criterio de selección: cambio ≥ 1.3 veces y p < 0.05 (3 réplicas) · ratios CRS/control a 9 y 14 días (Tabla I).",
+ refs:["choi","gorg"],
+ guide:[
+  {t:"Alineación de geles",s:{},h:"Ningún gel corre exactamente igual. El software deforma digitalmente cada imagen para que un mismo spot coincida en todos los geles y pueda compararse entre condiciones.",c:"Choi et al., 2018; Görg et al., 2004"},
+  {t:"Normalización y cuantificación",s:{},h:"El volumen de cada spot (área × intensidad) se normaliza contra la intensidad total del gel, lo que corrige diferencias de carga y de tinción. Después se compara cada spot entre grupos.",c:"Choi et al., 2018"},
+  {t:"Criterio de selección",s:{th:1.3},h:"Se eligen para identificación los spots con cambio de al menos 1.3 veces y p < 0.05. En la Tabla I, los valores negativos indican disminución en CRS: −2.0 significa la mitad de intensidad que el control.",f:"Ratio = V(CRS) / V(control); si < 1 se reporta como −1/ratio",c:"Choi et al., 2018 (Tabla I)"},
+  {t:"Una proteína, varios spots",s:{th:1.3,focus:"UCHL1"},h:"UCH-L1, PRDX2, ARPC5 y otras proteínas aparecen en spots que cambian en sentidos opuestos: uno baja y otro sube. No es contradictorio: son proteoformas de la misma proteína y el estrés redistribuye la proteína de una forma a otra.",c:"Choi et al., 2018"}
+ ],
+ explore(){return `
+  <div class="field"><label for="m4d">Comparación</label><select id="m4d"><option value="both">Ambos tiempos</option><option value="r9">CRS 9 días / control</option><option value="r14">CRS 14 días / control</option></select></div>
+  <div class="field"><label for="m4t">Umbral de cambio: <b id="m4tv">${fmt(S.m4.th,1)}</b> veces</label><input type="range" id="m4t" min="1" max="3" step="0.1" value="${S.m4.th}"></div>
+  <div class="field"><label for="m4s">Ordenar por</label><select id="m4s"><option value="r9">Ratio a 9 días</option><option value="r14">Ratio a 14 días</option><option value="name">Nombre</option></select></div>
+  <p class="note">Datos reales de la Tabla I de Choi et al. (2018). El valor p de cada spot no se incluye aquí; todos los spots listados cumplieron p < 0.05 en el estudio original.</p>`;},
+ bindExplore(){$("m4d").value=S.m4.day;$("m4s").value=S.m4.sort;
+  $("m4d").onchange=e=>{S.m4.day=e.target.value;M4.viz();};
+  $("m4t").oninput=e=>{S.m4.th=+e.target.value;$("m4tv").textContent=fmt(S.m4.th,1);M4.viz();};
+  $("m4s").onchange=e=>{S.m4.sort=e.target.value;M4.viz();};},
+ viz(st){
+  st=st||{};if(st.th)S.m4.th=st.th;
+  const th=S.m4.th,day=S.mode==="explore"?S.m4.day:"both",focus=st.focus;
+  const pass=r=>day==="r9"?Math.abs(r[3])>=th:day==="r14"?Math.abs(r[4])>=th:(Math.abs(r[3])>=th||Math.abs(r[4])>=th);
+  let rows=[...T1];const so=S.mode==="explore"?S.m4.sort:"r9";
+  rows.sort((a,b)=>so==="name"?a[0].localeCompare(b[0]):so==="r9"?b[3]-a[3]:b[4]-a[4]);
+  const bar=v=>{const s=5,w=Math.min(Math.abs(v),s)/s*50;const col=v>0?"var(--accent)":"var(--cut)";
+   return `<div class="dbar"><span class="mid"></span><span class="th" style="left:${50+th/5*50}%"></span><span class="th" style="left:${50-th/5*50}%"></span><i style="${v>0?`left:50%`:`right:50%`};width:${w}%;background:${col}"></i></div>`;};
+  const np=rows.filter(pass).length,prots=new Set(rows.filter(pass).map(r=>r[0])).size,multi=[...new Set(T1.filter(r=>r[2]).map(r=>r[0]))].length;
+  $("viz").innerHTML=`
+   <div class="stats"><div class="stat"><b>${np}</b><span>spots que superan ${fmt(th,1)} veces</span></div><div class="stat"><b>${prots}</b><span>proteínas distintas</span></div><div class="stat"><b>${multi}</b><span>proteínas con varios spots</span></div><div class="stat"><b>${T1.length}</b><span>spots en la Tabla I</span></div></div>
+   <div class="tbl-wrap"><table><thead><tr><th>Proteína</th><th>UniProt</th><th class="num">Spot</th><th class="num">9 d</th><th class="bar-cell">Cambio a 9 días</th><th class="num">14 d</th><th class="bar-cell">Cambio a 14 días</th><th>Selección</th></tr></thead><tbody>
+   ${rows.map(r=>`<tr class="${pass(r)?"":"out"} ${focus&&r[0]===focus?"hl":""}"><td><b>${r[0]}</b></td><td>${r[1]}</td><td class="num">${r[2]??"–"}</td><td class="num">${fmt(r[3])}</td><td class="bar-cell">${bar(r[3])}</td><td class="num">${fmt(r[4])}</td><td class="bar-cell">${bar(r[4])}</td><td>${pass(r)?'<span class="pill ok">Sí</span>':'<span class="pill no">No</span>'}</td></tr>`).join("")}
+   </tbody></table></div>
+   <div class="legend" style="border:0;padding:0"><span><i style="background:var(--accent);border-radius:2px"></i>Aumenta en CRS</span><span><i style="background:var(--cut);border-radius:2px"></i>Disminuye en CRS</span><span>Líneas finas: umbral ±${fmt(th,1)} · escala ±5</span></div>`;
+ },
+ quiz(){return [
+  {q:"En la Tabla I, SCRN1 tiene un ratio de −2.00 a los 9 días. ¿Qué significa?",o:["Su intensidad en CRS es la mitad que en el control","Su intensidad en CRS es el doble que en el control","Disminuyó 2 unidades de absorbancia","No cambió"],a:0,x:"Los valores negativos indican disminución: −2.0 equivale a un cociente CRS/control de 0.5."},
+  {q:"UCH-L1 tiene un spot que baja (−2.02) y otro que sube (3.63) a los 9 días. ¿Cuál es la interpretación más adecuada?",o:["Son proteoformas: el estrés desplaza la proteína hacia formas modificadas sin cambiar necesariamente la cantidad total","Es un error de alineación de los geles","La proteína aumenta y disminuye al mismo tiempo","Son dos proteínas diferentes con el mismo nombre"],a:0,x:"Choi et al. muestran que la intensidad total de UCH-L1 no cambia, pero aumentan los spots ácidos con Cys oxidadas."},
+  {q:"¿Por qué se normaliza el volumen de cada spot antes de comparar los geles?",o:["Para corregir diferencias de carga y de tinción entre geles","Para convertir la intensidad en concentración molar","Para eliminar los spots de fondo","Para calcular el punto isoeléctrico"],a:0,x:"Aunque se carguen 150 µg en cada gel, la carga y la tinción nunca son idénticas; la normalización permite comparar."},
+  {q:"Con el umbral de 1.3 veces, ¿se selecciona el spot de ATPD a los 9 días (ratio −1.19)?",o:["No, porque |−1.19| < 1.3","Sí, porque es negativo","Sí, porque cualquier cambio cuenta","No, porque los valores negativos nunca se seleccionan"],a:0,x:"Se compara el valor absoluto con el umbral. A los 14 días ATPD (−1.32) sí lo supera."}
+ ];}
+};
+
+/* =============== MÓDULO 5 · Digestión en gel y nanoLC =============== */
+function cutSites(seq){const s=[];for(let i=0;i<seq.length-1;i++)if((seq[i]==="K"||seq[i]==="R")&&seq[i+1]!=="P")s.push(i);return s;}
+function digestUCH(pf,mcMax){
+ const sites=cutSites(UCH),bd=[0,...sites.map(i=>i+1),UCH.length],out=[];
+ for(let a=0;a<bd.length-1;a++)for(let mc=0;mc<=mcMax&&a+mc+1<bd.length;mc++){
+  const s=bd[a],e=bd[a+mc+1],p=UCH.slice(s,e);let M=H2O;const mods=[];
+  for(let i=s;i<e;i++){const c=UCH[i],pos=i+1;M+=MONO[c];
+   if(c==="C"){const o=pos===90?pf.c90:pos===152?pf.c152:null;
+    if(o){M+=OX[o].mono;mods.push(`<span class="mod-c">C${pos} ${o==="tri"?"+47.985":"+31.990"}</span>`);}
+    else{M+=CAM;mods.push(`C${pos} +57.021`);}}
+   if(pos===85&&pf.t85){M+=PHOS.mono;mods.push(`<span class="mod-p">T85 +79.966</span>`);}
+  }
+  const h=[...p].reduce((t,c)=>t+KD[c],0)/p.length;
+  out.push({p,s:s+1,e,mc,M,mods,h,paper:(s+1===84&&e===115)||(s+1===136&&e===153)});
+ }
+ return out;
+}
+const M5={
+ title:"Digestión en gel y nanoLC-MS/MS",short:"Tripsina · Q-TOF · Top-10",
+ proto:"Spots escindidos y digeridos en gel con tripsina (hasta 1 escisión fallida) · nanoAcquity UPLC acoplado a SYNAPT G2-Si Q-TOF (Waters) · gradiente lineal de 5 a 40% B en 80 min (A: agua/ácido fórmico 0.1%; B: acetonitrilo/ácido fórmico 0.1%) · 1 barrido MS seguido de MS/MS de los 10 precursores más abundantes.",
+ refs:["choi","shev","olsen","steen","kyte","uni"],
+ guide:[
+  {t:"Escisión del spot y desteñido",s:{},h:"Cada spot seleccionado se recorta del gel con una punta o bisturí, se corta en cubos de ~1 mm y se destiñe. Para geles con plata se usa ferricianuro de potasio y tiosulfato de sodio. Después el gel se deshidrata con acetonitrilo.",c:"Shevchenko et al., 2006"},
+  {t:"Digestión con tripsina en el gel",s:{},h:"El gel deshidratado absorbe la solución de tripsina. La enzima corta en el extremo C-terminal de K y R (no antes de P). Choi et al. permitieron hasta una escisión fallida en la búsqueda. Las Cys reducidas ya llevan carbamidometilo del equilibrado; las Cys oxidadas conservan su +31.990 o +47.985 Da.",f:"M = Σ residuos + H₂O + modificaciones",c:"Shevchenko et al., 2006; Olsen et al., 2004; Choi et al., 2018",note:()=>`Los péptidos reportados por Choi et al. aparecen resaltados: 84–115 (Cys90) y 136–153 (Cys152).`},
+  {t:"Separación por nanoLC en fase reversa",s:{},h:"Los péptidos extraídos se separan en una columna C18 con un gradiente de 5 a 40% de acetonitrilo en 80 min. Los péptidos más hidrofóbicos eluyen más tarde. Aquí el tiempo de retención se estima con el índice de hidropatía de Kyte-Doolittle, que es solo una aproximación.",c:"Choi et al., 2018; Kyte y Doolittle, 1982"},
+  {t:"Adquisición dependiente de datos (top-10)",s:{top:true},h:"En cada ciclo el Q-TOF registra un espectro MS1 y selecciona los 10 precursores más intensos para fragmentarlos (MS/MS). Los péptidos de baja abundancia pueden quedar sin fragmentar si coeluyen con otros más intensos.",c:"Choi et al., 2018; Steen y Mann, 2004"}
+ ],
+ explore(){return `
+  <div class="field"><label for="m5p">Proteoforma (spot del gel)</label><select id="m5p">${PF.map((p,i)=>`<option value="${i}">Spot ${p.spot} · ${p.txt}</option>`).join("")}</select></div>
+  <div class="field"><label for="m5m">Escisiones fallidas permitidas: <b id="m5mv">${S.m5.mc}</b></label><input type="range" id="m5m" min="0" max="2" step="1" value="${S.m5.mc}"><span class="note">El protocolo usa 1.</span></div>
+  <p class="note">Haz clic en un pico del cromatograma o en una fila de la tabla para ver sus iones precursores.</p>`;},
+ bindExplore(){$("m5p").value=String(S.m5.pf);
+  $("m5p").onchange=e=>{S.m5.pf=+e.target.value;M5.viz({top:true});};
+  $("m5m").oninput=e=>{S.m5.mc=+e.target.value;$("m5mv").textContent=S.m5.mc;M5.viz({top:true});};},
+ viz(st){
+  st=st||{};const pf=PF[S.mode==="guide"?3:S.m5.pf],mcMax=S.mode==="guide"?1:S.m5.mc;
+  const peps=digestUCH(pf,mcMax).filter(p=>p.p.length>=5);
+  peps.forEach((p,i)=>{p.rt=Math.max(4,Math.min(78,8+((p.h+2.2)/3.6)*66));p.int=0.25+seeded(p.s*7+p.e)*0.75;if(p.paper)p.int=Math.max(p.int,0.7);});
+  const top=new Set([...peps].sort((a,b)=>b.int-a.int).slice(0,10).map(p=>p.s+"-"+p.e));
+  // cromatograma
+  const W=760,H=240,L=46,R=46,T=14,B=34,xm=t=>L+t/90*(W-L-R),ym=v=>T+(1-v)*(H-T-B);
+  const pts=[];for(let t=0;t<=90;t+=0.15){let v=0;peps.forEach(p=>{v+=p.int*Math.exp(-((t-p.rt)**2)/(2*0.35**2));});pts.push([t,Math.min(v,1.15)/1.15]);}
+  let g=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Cromatograma simulado">`;
+  [0,10,20,30,40,50,60,70,80,90].forEach(t=>{g+=`<line class="grid" x1="${xm(t)}" x2="${xm(t)}" y1="${T}" y2="${ym(0)}"/><text x="${xm(t)}" y="${H-B+16}" text-anchor="middle">${t}</text>`;});
+  g+=`<line class="axis" x1="${L}" x2="${W-R}" y1="${ym(0)}" y2="${ym(0)}"/><text x="${(L+W-R)/2}" y="${H-3}" text-anchor="middle">Tiempo (min)</text><text x="14" y="${T+80}" transform="rotate(-90 14 ${T+80})" text-anchor="middle">Intensidad rel.</text>`;
+  // gradiente %B
+  const yb=b=>ym(b/45);g+=`<polyline fill="none" stroke="var(--pro)" stroke-width="1.5" stroke-dasharray="5 4" points="${xm(0)},${yb(5)} ${xm(80)},${yb(40)} ${xm(90)},${yb(40)}"/>`;
+  [5,20,40].forEach(b=>{g+=`<text x="${W-R+6}" y="${yb(b)+4}" style="fill:var(--pro)">${b}%</text>`;});
+  g+=`<polyline style="fill:color-mix(in srgb,var(--accent) 14%,transparent)" stroke="var(--accent)" stroke-width="1.5" points="${xm(0)},${ym(0)} ${pts.map(([t,v])=>`${xm(t).toFixed(1)},${ym(v).toFixed(1)}`).join(" ")} ${xm(90)},${ym(0)}"/>`;
+  peps.forEach((p,i)=>{const isTop=top.has(p.s+"-"+p.e);
+   if(st.top||S.mode!=="guide"){g+=`<g class="pk" data-i="${i}" style="cursor:pointer"><circle cx="${xm(p.rt)}" cy="${ym(p.int/1.15)-8}" r="${p.paper?6:4}" fill="${p.paper?"var(--cys)":isTop?"var(--accent)":"var(--surface)"}" stroke="${isTop?"var(--accent)":"var(--muted)"}" stroke-width="1.5"/></g>`;}});
+  g+=`</svg>`;
+  const selP=S.m5.sel!=null&&peps[S.m5.sel]?peps[S.m5.sel]:peps.find(p=>p.paper);
+  $("viz").innerHTML=`
+   <div class="panel"><div class="row" style="justify-content:space-between"><h3>Cromatograma nanoLC simulado · ${"Spot "+pf.spot}</h3><span class="note">Línea punteada: % de B</span></div>${g}
+    <div class="legend" style="border:0;padding:0"><span><i style="background:var(--accent)"></i>Seleccionado para MS/MS (top-10)</span><span><i style="background:var(--cys)"></i>Péptido reportado por Choi et al.</span><span><i style="background:var(--surface);border:1px solid var(--muted)"></i>No seleccionado</span><span>Retención e intensidad: estimaciones didácticas</span></div></div>
+   <div class="panel" id="m5sel"></div>
+   <div class="tbl-wrap"><table><thead><tr><th>Péptido</th><th class="num">Posición</th><th class="num">EF</th><th>Modificaciones</th><th class="num">M mono (Da)</th><th class="num">[M+2H]²⁺</th><th class="num">[M+3H]³⁺</th><th class="num">t_R est. (min)</th><th>MS/MS</th></tr></thead><tbody>
+   ${peps.map((p,i)=>`<tr class="click ${p.paper?"hl":""}" data-i="${i}"><td class="pep">${p.p}</td><td class="num">${p.s}–${p.e}</td><td class="num">${p.mc}</td><td class="wrap">${p.mods.join(", ")||"–"}</td><td class="num">${fmt(p.M,4)}</td><td class="num">${fmt(mz(p.M,2),4)}</td><td class="num">${fmt(mz(p.M,3),4)}</td><td class="num">${fmt(p.rt,1)}</td><td>${top.has(p.s+"-"+p.e)?'<span class="pill ok">Top-10</span>':'<span class="pill no">No</span>'}</td></tr>`).join("")}</tbody></table></div>`;
+  const showSel=p=>{$("m5sel").innerHTML=`<div class="row" style="justify-content:space-between"><h3>Péptido ${p.s}–${p.e}${p.paper?" · reportado en la Tabla II":""}</h3><span class="note">t_R ≈ ${fmt(p.rt,1)} min</span></div><div class="formula" style="word-break:break-all">${p.p}</div><div class="stats three"><div class="stat"><b>${fmt(p.M,4)}</b><span>M monoisotópica (Da)</span></div><div class="stat"><b>${fmt(mz(p.M,2),4)}</b><span>m/z [M+2H]²⁺</span></div><div class="stat"><b>${fmt(mz(p.M,3),4)}</b><span>m/z [M+3H]³⁺</span></div></div><p class="note">Modificaciones: ${p.mods.join(", ")||"ninguna"}.</p>`;};
+  showSel(selP);
+  document.querySelectorAll("#viz tr.click").forEach(tr=>tr.onclick=()=>{S.m5.sel=+tr.dataset.i;showSel(peps[S.m5.sel]);});
+  document.querySelectorAll("#viz .pk").forEach(el=>el.onclick=()=>{S.m5.sel=+el.dataset.i;showSel(peps[S.m5.sel]);});
+ },
+ quiz(){
+  const base=digestUCH(PF[0],1).find(p=>p.s===136&&p.e===153),ox=digestUCH(PF[3],1).find(p=>p.s===136&&p.e===153);
+  return [
+  {q:"El péptido NEAIQAAHDSVAQEGQCR (136–153) aparece con Cys152 carbamidometilada en el spot 1 y trioxidada en el spot 4. ¿Cuál es la diferencia de masa monoisotópica entre ambos?",o:[fmt(base.M-ox.M,4)+" Da",fmt(OX.tri.mono,4)+" Da",fmt(CAM,4)+" Da",fmt(base.M-ox.M+PROTON,4)+" Da"],a:0,x:`+57.02146 (carbamidometilo) − 47.98474 (SO₃H) = ${fmt(CAM-OX.tri.mono,4)} Da. Masas: ${fmt(base.M,4)} vs ${fmt(ox.M,4)} Da.`},
+  {q:"El péptido 84–115 (QTIGNSCGTIGLIHAVANNQDK|LEFEDGSVLK) contiene una lisina interna. ¿Por qué aparece como un solo péptido?",o:["Porque la tripsina no cortó tras K105: es una escisión fallida, permitida (máx. 1) en la búsqueda","Porque la K105 va seguida de prolina","Porque la tripsina no corta tras lisina","Porque la Cys90 oxidada bloquea a la tripsina"],a:0,x:"K105 va seguida de L, así que era un sitio válido; el protocolo admite hasta una escisión fallida (Choi et al., 2018)."},
+  {q:`¿Qué m/z tendría el ion [M+2H]²⁺ del péptido 136–153 con Cys152 trioxidada (M = ${fmt(ox.M,4)} Da)?`,o:[fmt(mz(ox.M,2),4),fmt(ox.M/2,4),fmt(mz(ox.M,3),4),fmt(mz(ox.M,1),4)],a:0,x:`(${fmt(ox.M,4)} + 2 × 1.007276) / 2 = ${fmt(mz(ox.M,2),4)}.`},
+  {q:"En la adquisición top-10, ¿qué péptidos tienen más riesgo de no ser fragmentados?",o:["Los poco abundantes que coeluyen con muchos péptidos más intensos","Los más intensos","Los que eluyen al inicio del gradiente","Los que tienen carga 2+"],a:0,x:"El instrumento elige por intensidad en cada ciclo; esto produce el submuestreo característico de la DDA (Steen y Mann, 2004)."}
+ ];}
+};
+
+/* =============== MÓDULO 6 · Búsqueda en base de datos y validación =============== */
+const CMOD={cam:{d:CAM,l:"Carbamidometil (+57.021)"},di:{d:31.98983,l:"Dioxidación –SO₂H (+31.990)"},tri:{d:47.98474,l:"Trioxidación –SO₃H (+47.985)"},prop:{d:71.03711,l:"Propionamida (+71.037)"},ser:{d:MONO.S-MONO.C,l:"Conversión Cys→Ser (−15.977)"}};
+const PEP6={
+ a:{s:84,e:115,cys:90,label:"84–115 · contiene Cys90 (sitio activo)",
+    cands:[{c:"cam"},{c:"di"},{c:"tri"},{c:"prop"},{c:"di",p:85},{c:"tri",p:85},{c:"tri",p:89}]},
+ b:{s:136,e:153,cys:152,label:"136–153 · contiene Cys152",
+    cands:[{c:"cam"},{c:"di"},{c:"tri"},{c:"prop"},{c:"ser"}]}
+};
+function truthFor(spot,key){const pf=PF[spot];if(key==="a")return {c:pf.c90||"cam",p:pf.t85?85:null};return {c:pf.c152||"cam",p:null};}
+function hypLabel(h,key){const P=PEP6[key];let t=`Cys${P.cys} ${CMOD[h.c].l}`;if(h.p)t+=` + p${UCH[h.p-1]==="T"?"Thr":"Ser"}${h.p} (+79.966)`;return t;}
+function resMasses(key,h){const P=PEP6[key],out=[];for(let pos=P.s;pos<=P.e;pos++){let m=MONO[UCH[pos-1]];if(pos===P.cys)m+=CMOD[h.c].d;if(h.p===pos)m+=PHOS.mono;out.push(m);}return out;}
+function fragIons(rm){const L=rm.length,ions=[];let b=0,tot=rm.reduce((a,c)=>a+c,0),y;
+ for(let i=1;i<L;i++){b+=rm[i-1];y=tot-b+H2O;
+  ions.push({t:"b",n:i,m1:b+PROTON,m2:(b+2*PROTON)/2});ions.push({t:"y",n:L-i,m1:y+PROTON,m2:(y+2*PROTON)/2});}
+ return {ions,M:tot+H2O};}
+const MZLO=100,MZHI=2000;
+function simSpectrum(spot,key){
+ const h=truthFor(spot,key),{ions,M}=fragIons(resMasses(key,h)),pk=[];let sd=spot*1000+(key==="a"?7:3);
+ const rnd=()=>seeded(sd++);
+ ions.forEach(io=>{const keep=rnd()<(io.t==="y"?0.68:0.5);if(!keep)return;
+  const mzv=io.m1<=MZHI?io.m1:io.m2;if(mzv<MZLO||mzv>MZHI)return;
+  pk.push({mz:mzv+(rnd()-.5)*0.06,i:io.t==="y"?0.3+rnd()*0.7:0.12+rnd()*0.45,src:io.t+io.n});});
+ for(let k=0;k<150;k++)pk.push({mz:MZLO+rnd()*(MZHI-MZLO),i:0.02+rnd()*0.2,src:null});
+ return {peaks:pk.sort((a,b)=>a.mz-b.mz),M,h};
+}
+function lnC(n,k){let s=0;for(let i=1;i<=k;i++)s+=Math.log(n-k+i)-Math.log(i);return s;}
+function binomTailLog10(n,k,p){if(k<=0)return 0;let terms=[];for(let j=k;j<=n;j++)terms.push(lnC(n,j)+j*Math.log(p)+(n-j)*Math.log(1-p));
+ const mx=Math.max(...terms);return (mx+Math.log(terms.reduce((a,t)=>a+Math.exp(t-mx),0)))/Math.LN10;}
+function scoreCand(spec,key,h,tol){
+ const {ions,M}=fragIons(resMasses(key,h));const th=[];
+ ions.forEach(io=>{[[io.m1,1],[io.m2,2]].forEach(([m,z])=>{if(m>=MZLO&&m<=MZHI)th.push({...io,mz:m,z});});});
+ th.forEach(t=>{t.hit=spec.peaks.some(p=>Math.abs(p.mz-t.mz)<=tol);});
+ const n=th.length,k=th.filter(t=>t.hit).length,p=Math.min(0.95,spec.peaks.length*2*tol/(MZHI-MZLO));
+ const lg=binomTailLog10(n,k,p),score=Math.max(0,-10*lg);
+ return {M,dM:M-spec.M,prec:Math.abs(M-spec.M)<=tol,th,n,k,p,score};
+}
+const MUT=[["WT","Silvestre",true,"Puede oxidarse en Cys90 y Cys152"],["C90S","Cys90→Ser",false,"Ser no se oxida: Cys90 queda 'muerta' para el redox"],["C152S","Cys152→Ser",false,"Cys152 no puede oxidarse"],["C90/152S","Doble Cys→Ser",false,"Ninguna de las dos Cys puede oxidarse"],["C90D","Cys90→Asp",true,"El carboxilato de Asp imita la carga negativa de la Cys oxidada"],["C152D","Cys152→Asp",true,"Imita la Cys152 oxidada"],["C90/152D","Doble Cys→Asp",true,"Imita ambas Cys oxidadas"]];
+const M6={
+ title:"Búsqueda en base de datos y validación",short:"Mascot · ±0.5 Da · score ≥ 30",
+ proto:"PLGS 2.3 → Mascot 2.2.0 contra NCBInr y SwissProt (<i>Mus musculus</i>) · tripsina, ≤ 1 escisión fallida · sin modificaciones fijas · modificaciones variables, entre ellas carbamidometilación, propionamida, di- y trioxidación de Cys, conversión Cys→Ser y fosforilación · tolerancia ±0.5 Da en precursor y fragmentos · ion score = −10·log(P), ≥ 30 · validación manual de espectros · validación biológica en células HT-22 (H₂O₂ 0.3 mM, 2 h; xCELLigence 72 h).",
+ refs:["choi","perkins","steen","uni"],
+ guide:[
+  {t:"Del espectro a la lista de picos",s:{spot:3,key:"b",cand:2},h:"El software del equipo (PLGS 2.3) convierte cada espectro MS/MS en una lista de picos: pares de m/z e intensidad. Mascot compara esa lista contra los péptidos teóricos de las proteínas de ratón en NCBInr y SwissProt. A la izquierda de la gráfica verás picos de fragmentos reales mezclados con ruido.",c:"Choi et al., 2018; Perkins et al., 1999"},
+  {t:"Filtro por masa del precursor",s:{spot:3,key:"b",cand:2,focus:"prec"},h:"Solo se evalúan los candidatos cuya masa teórica cae a ±0.5 Da de la masa medida del precursor. En el spot 4, la hipótesis «Cys152 carbamidometilada» queda descartada: difiere en 9.036 Da de la masa observada. Como no hay modificaciones fijas, el programa prueba cada estado de la Cys como modificación variable.",f:"Δm = M(candidato) − M(observada); se acepta si |Δm| ≤ 0.5 Da",c:"Choi et al., 2018"},
+  {t:"Iones b e y",s:{spot:3,key:"b",cand:2,focus:"frag"},h:"Al fragmentarse el enlace peptídico, el ion b conserva el extremo N-terminal y el ion y conserva el C-terminal. La diferencia entre dos iones consecutivos de una serie equivale a la masa de un residuo. Así se lee la secuencia y se localiza en qué aminoácido está la masa extra.",f:"b_i = Σ(residuos 1…i) + H⁺   ·   y_j = Σ(últimos j residuos) + H₂O + H⁺",c:"Steen y Mann, 2004"},
+  {t:"Puntuación del péptido",s:{spot:3,key:"b",cand:2,focus:"score"},h:"Mascot calcula la probabilidad P de que las coincidencias entre picos observados y teóricos se deban al azar, y la expresa como ion score = −10·log₁₀(P). Choi et al. exigieron un puntaje total ≥ 30 (P ≤ 0.001) para aceptar una modificación. Aquí usamos un modelo binomial simplificado de esa idea, así que los valores absolutos no son los de Mascot.",f:"Score = −10·log₁₀ P(≥ k coincidencias de n | p)",c:"Perkins et al., 1999; Choi et al., 2018"},
+  {t:"Localizar la modificación",s:{spot:3,key:"a",cand:5,focus:"loc"},h:"En el péptido 84–115 del spot 4, «pThr85» y «pSer89» tienen exactamente la misma masa de precursor. Solo los iones b2 a b5, que contienen Thr85 pero no Ser89, distinguen ambas hipótesis. Compara sus puntajes en la tabla: esos iones definen el sitio.",c:"Steen y Mann, 2004; Choi et al., 2018"},
+  {t:"Validación biológica",s:{val:true},h:"Choi et al. confirmaron las proteoformas con Western blot 2D. Además expresaron UCH-L1 silvestre y mutantes en células HT-22 expuestas a H₂O₂. La forma silvestre y los mutantes Cys→Asp, que imitan la carga negativa de la Cys oxidada, protegieron a las células. Los mutantes Cys→Ser, que no pueden oxidarse, perdieron la protección.",c:"Choi et al., 2018"}
+ ],
+ explore(){const st=S.m6;return `
+  <div class="field"><label for="m6s">Spot del gel (proteoforma)</label><select id="m6s">${PF.map((p,i)=>`<option value="${i}">Spot ${p.spot} · ${p.txt}</option>`).join("")}</select></div>
+  <div class="field"><label for="m6k">Péptido</label><select id="m6k">${Object.entries(PEP6).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("")}</select></div>
+  <div class="field"><label for="m6t">Tolerancia de masa: <b id="m6tv">±${fmt(st.tol,2)}</b> Da</label><input type="range" id="m6t" min="0.05" max="1.5" step="0.05" value="${st.tol}"><span class="note">El protocolo usa ±0.5 Da. Observa cómo una tolerancia amplia sube las coincidencias al azar y baja el puntaje.</span></div>
+  <label class="chk"><input type="checkbox" id="m6v" ${st.val?"checked":""}> <span>Mostrar la validación con mutantes en HT-22</span></label>
+  <p class="note">Haz clic en un candidato de la tabla para anotar sus iones sobre el espectro.</p>`;},
+ bindExplore(){const st=S.m6;$("m6s").value=String(st.spot);$("m6k").value=st.key;
+  $("m6s").onchange=e=>{st.spot=+e.target.value;st.cand=null;M6.viz();};
+  $("m6k").onchange=e=>{st.key=e.target.value;st.cand=null;M6.viz();};
+  $("m6t").oninput=e=>{st.tol=+e.target.value;$("m6tv").textContent="±"+fmt(st.tol,2);M6.viz();};
+  $("m6v").onchange=e=>{st.val=e.target.checked;M6.viz();};},
+ viz(gs){
+  const st=S.m6;
+  if(gs){if(gs.val){M6.valViz();return;}st.spot=gs.spot;st.key=gs.key;st.cand=gs.cand;st.tol=0.5;st.focus=gs.focus||null;}
+  else st.focus=null;
+  const key=st.key,P=PEP6[key],spec=simSpectrum(st.spot,key),seq=UCH.slice(P.s-1,P.e);
+  const res=P.cands.map((h,i)=>({h,i,r:scoreCand(spec,key,h,st.tol),truth:h.c===spec.h.c&&(h.p||null)===(spec.h.p||null)}));
+  const valid=res.filter(x=>x.r.prec).sort((a,b)=>b.r.score-a.r.score);
+  if(st.cand==null||!res[st.cand])st.cand=(valid[0]||res[0]).i;
+  const C=res[st.cand];
+  // espectro
+  const W=780,H=280,L=46,R=14,T=26,B=36,xm=m=>L+(m-MZLO)/(MZHI-MZLO)*(W-L-R),ym=v=>T+(1-v)*(H-T-B);
+  let g=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Espectro MS/MS simulado">`;
+  [100,400,700,1000,1300,1600,1900].forEach(m=>{g+=`<line class="grid" x1="${xm(m)}" x2="${xm(m)}" y1="${T}" y2="${ym(0)}"/><text x="${xm(m)}" y="${H-B+16}" text-anchor="middle">${m}</text>`;});
+  g+=`<line class="axis" x1="${L}" x2="${W-R}" y1="${ym(0)}" y2="${ym(0)}"/><text x="${(L+W-R)/2}" y="${H-3}" text-anchor="middle">m/z</text><text x="14" y="${T+90}" transform="rotate(-90 14 ${T+90})" text-anchor="middle">Intensidad rel.</text>`;
+  const ann=[];
+  spec.peaks.forEach(p=>{const m=C.r.th.find(t=>t.hit&&Math.abs(t.mz-p.mz)<=st.tol);
+   const col=m?(m.t==="b"?"var(--basic)":"var(--cut)"):"var(--muted)";
+   g+=`<line x1="${xm(p.mz)}" x2="${xm(p.mz)}" y1="${ym(0)}" y2="${ym(p.i)}" stroke="${col}" stroke-width="${m?2:1}" ${m?"":'opacity=".55"'}/>`;
+   if(m)ann.push({x:xm(p.mz),y:ym(p.i),l:m.t+m.n+(m.z===2?"²⁺":""),c:col,i:p.i});});
+  ann.sort((a,b)=>b.i-a.i);const used=[];
+  ann.forEach(a=>{if(used.some(u=>Math.abs(u-a.x)<16))return;used.push(a.x);g+=`<text x="${a.x}" y="${Math.max(T-4,a.y-5)}" text-anchor="middle" style="fill:${a.c};font-weight:600">${a.l}</text>`;});
+  g+=`</svg>`;
+  // escalera b/y
+  const hitB=new Set(C.r.th.filter(t=>t.hit&&t.t==="b").map(t=>t.n)),hitY=new Set(C.r.th.filter(t=>t.hit&&t.t==="y").map(t=>t.n)),Lp=seq.length;
+  let lad=`<div class="ladder">`;
+  for(let i=0;i<Lp;i++){const pos=P.s+i,mod=pos===P.cys?"c":(C.h.p===pos?"p":"");
+   lad+=`<span class="aa ${mod}" title="${UCH[pos-1]}${pos}">${seq[i]}<sub>${pos}</sub></span>`;
+   if(i<Lp-1)lad+=`<span class="brk"><i class="bb ${hitB.has(i+1)?"on":""}" title="b${i+1}"></i><i class="yy ${hitY.has(Lp-i-1)?"on":""}" title="y${Lp-i-1}"></i></span>`;}
+  lad+=`</div>`;
+  const fragRows=[];for(let i=1;i<Lp;i++){const b=C.r.th.find(t=>t.t==="b"&&t.n===i&&t.z===1)||C.r.th.find(t=>t.t==="b"&&t.n===i),y=C.r.th.find(t=>t.t==="y"&&t.n===Lp-i&&t.z===1)||C.r.th.find(t=>t.t==="y"&&t.n===Lp-i);
+   const bAny=C.r.th.some(t=>t.t==="b"&&t.n===i&&t.hit),yAny=C.r.th.some(t=>t.t==="y"&&t.n===Lp-i&&t.hit);
+   const loc=st.focus==="loc"&&i>=2&&i<=5;
+   fragRows.push(`<tr class="${loc?"hl":""}"><td class="num">${i}</td><td class="num" style="${bAny?"color:var(--basic);font-weight:600":""}">${b?fmt(b.mz,3)+(b.z===2?" (2+)":""):"–"}</td><td class="num">b${i}</td><td style="font-family:var(--f-mono);text-align:center">${seq[i-1]}${P.s+i-1===P.cys?"*":""}</td><td class="num">y${Lp-i}</td><td class="num" style="${yAny?"color:var(--cut);font-weight:600":""}">${y?fmt(y.mz,3)+(y.z===2?" (2+)":""):"–"}</td></tr>`);}
+  const best=valid[0];
+  $("viz").innerHTML=`
+   <div class="stats">
+    <div class="stat"><b>${fmt(spec.M,3)}</b><span>M observada del precursor (Da)</span></div>
+    <div class="stat"><b>${spec.peaks.length}</b><span>picos en el espectro</span></div>
+    <div class="stat"><b>${C.r.k}/${C.r.n}</b><span>iones coincidentes del candidato</span></div>
+    <div class="stat"><b style="color:${C.r.prec&&C.r.score>=30?"var(--ok)":"var(--bad)"}">${C.r.prec?fmt(C.r.score,1):"–"}</b><span>score del candidato (umbral 30)</span></div></div>
+   <div class="panel" ${st.focus==="frag"?'style="border-color:var(--accent)"':""}><div class="row" style="justify-content:space-between"><h3>Espectro MS/MS simulado · Spot ${PF[st.spot].spot} · péptido ${P.s}–${P.e}</h3><span class="note">Candidato anotado: ${hypLabel(C.h,key)}</span></div>${g}
+    <div class="legend" style="border:0;padding:0"><span><i style="background:var(--basic);border-radius:2px"></i>Ion b coincidente</span><span><i style="background:var(--cut);border-radius:2px"></i>Ion y coincidente</span><span><i style="background:var(--muted);border-radius:2px"></i>Pico sin asignar (ruido u otro ion)</span></div>
+    ${lad}
+    <p class="note">Cada marca entre residuos indica un enlace confirmado: arriba por un ion b, abajo por un ion y. Residuo con borde ámbar: Cys modificada; borde morado: sitio fosforilado.</p></div>
+   <div class="tbl-wrap" style="max-height:none" ${st.focus==="prec"||st.focus==="score"||st.focus==="loc"?'data-f="1"':""}><table><thead><tr><th>Candidato (hipótesis)</th><th class="num">M teórica</th><th class="num">Δm (Da)</th><th>Precursor ±${fmt(st.tol,2)}</th><th class="num">Iones k/n</th><th class="num">Score</th><th>Resultado</th></tr></thead><tbody>
+   ${res.map(x=>{const ok=x.r.prec&&x.r.score>=30,top=best&&x===best;return `<tr class="click ${x.i===st.cand?"hl":""} ${x.r.prec?"":"out"}" data-i="${x.i}"><td class="wrap">${hypLabel(x.h,key)}</td><td class="num">${fmt(x.r.M,4)}</td><td class="num">${(x.r.dM>=0?"+":"")+fmt(x.r.dM,3)}</td><td>${x.r.prec?'<span class="pill ok">Pasa</span>':'<span class="pill no">Excluido</span>'}</td><td class="num">${x.r.k}/${x.r.n}</td><td class="num">${x.r.prec?fmt(x.r.score,1):"–"}</td><td>${!x.r.prec?"–":top&&ok?'<span class="pill ok">Mejor asignación</span>':ok?'<span class="pill ph">Significativo</span>':'<span class="pill no">No significativo</span>'}</td></tr>`;}).join("")}
+   </tbody></table></div>
+   <p class="note">Modelo de puntuación: probabilidad binomial de obtener al menos k coincidencias entre n iones teóricos (b e y, cargas 1+ y 2+, m/z ${MZLO}–${MZHI}) cuando cada ion tiene probabilidad p = ${fmt(C.r.p,3)} de coincidir al azar con algún pico. Es una simplificación didáctica del principio probabilístico de Mascot (Perkins et al., 1999). El espectro se genera a partir de la proteoforma del spot elegido. La hipótesis correcta para este spot es: <b>${hypLabel(spec.h,key)}</b>.</p>
+   <div class="tbl-wrap"><table><thead><tr><th class="num">#</th><th class="num">b (m/z)</th><th class="num">Ion</th><th style="text-align:center">Residuo</th><th class="num">Ion</th><th class="num">y (m/z)</th></tr></thead><tbody>${fragRows.join("")}</tbody></table></div>`;
+  document.querySelectorAll("#viz tr.click").forEach(tr=>tr.onclick=()=>{st.cand=+tr.dataset.i;M6.viz(S.mode==="guide"?{...M6.guide[S.g[6]].s,cand:+tr.dataset.i}:null);});
+  if(st.val&&S.mode==="explore"){const d=document.createElement("div");$("viz").appendChild(d);M6.valViz(d);}
+ },
+ valViz(target){
+  const html=`<div class="panel"><h3>Validación 1 · Western blot 2D</h3><p style="max-width:75ch">Con geles 2D pequeños y anticuerpo anti-UCH-L1, los autores confirmaron que en el estrés crónico aumentan las formas más ácidas de UCH-L1, igual que en los geles teñidos con plata. Hicieron lo mismo con DPYL2, ARPC5, PRDX2 y HDHD2.</p></div>
+   <div class="panel"><h3>Validación 2 · Mutantes de cisteína en células HT-22</h3>
+    <p class="note">Transfección con UCH-L1-Myc (3 µg de plásmido, 7.5 µL de Lipofectamine 2000, 24 h) · estrés oxidativo con H₂O₂ 0.3 mM durante 2 h · viabilidad registrada en tiempo real con xCELLigence cada 15 min durante 72 h.</p>
+    <div class="tbl-wrap" style="max-height:none"><table><thead><tr><th>Construcción</th><th>Cambio</th><th>Lógica del diseño</th><th>Protección frente a H₂O₂</th></tr></thead><tbody>
+    ${MUT.map(m=>`<tr><td><b>${m[0]}</b></td><td>${m[1]}</td><td class="wrap">${m[3]}</td><td>${m[2]?'<span class="pill ok">Sí</span>':'<span class="pill no">Se pierde</span>'}</td></tr>`).join("")}</tbody></table></div>
+    <p style="max-width:75ch">Interpretación: si la protección dependiera solo de tener la proteína, todos los mutantes protegerían. Que los mutantes Cys→Asp protejan y los Cys→Ser no sugiere que la carga negativa en Cys90 y Cys152, como la que aportan –SO₂H y –SO₃H, contribuye a la función neuroprotectora. Sin estrés oxidativo no hubo diferencias claras entre construcciones. Los autores advierten que la conclusión proviene de experimentos <i>in vitro</i>.</p>
+    <p class="note">La tabla resume el resultado cualitativo reportado; no reproduce valores numéricos de viabilidad.</p></div>`;
+  if(target)target.innerHTML=html;else $("viz").innerHTML=html;
+ },
+ quiz(){const spec=simSpectrum(3,"b"),cam=scoreCand(spec,"b",{c:"cam"},0.5);
+  return [
+  {q:`Para el péptido 136–153 del spot 4 se observa M = ${fmt(spec.M,3)} Da. La hipótesis «Cys152 carbamidometilada» da M = ${fmt(cam.M,3)} Da. Con tolerancia de ±0.5 Da, ¿qué ocurre con ella?`,o:["Se excluye, porque Δm = "+fmt(cam.dM,3)+" Da supera la tolerancia","Se acepta, porque la Cys siempre se carbamidometila","Se acepta, porque los iones b coinciden","No puede evaluarse sin el pI"],a:0,x:`57.021 − 47.985 = 9.036 Da: la diferencia supera por mucho ±0.5 Da. Sin modificaciones fijas, Mascot puede probar el estado de oxidación correcto.`},
+  {q:"En el péptido 84–115 (Q84-T85-I86-G87-N88-S89-C90…), «pThr85» y «pSer89» tienen la misma masa de precursor. ¿Qué iones permiten distinguirlas?",o:["b2 a b5, que contienen Thr85 pero no Ser89","Solo el ion precursor","y1 e y2, en el extremo C-terminal","Ninguno; es imposible distinguirlas por MS/MS"],a:0,x:"Si el fosfato está en Thr85, b2–b5 llevan +79.966 Da; si está en Ser89, no. Los iones que flanquean los sitios posibles son los que localizan la modificación."},
+  {q:"Choi et al. aceptaron modificaciones con un score de Mascot ≥ 30. ¿A qué probabilidad de coincidencia al azar equivale?",o:["P = 0.001","P = 0.05","P = 0.30","P = 0.03"],a:0,x:"Score = −10·log₁₀(P) → 30 = −10·log₁₀(P) → P = 10⁻³."},
+  {q:"¿Por qué el mutante C90D de UCH-L1 conserva la protección frente a H₂O₂ y el C90S no?",o:["Asp aporta una carga negativa que imita a la Cys oxidada; Ser no puede oxidarse ni aporta esa carga","Asp aumenta la masa de la proteína","Ser bloquea la expresión de la proteína","Asp hace que la proteína sea más básica"],a:0,x:"El carboxilato de Asp es un mímico de los ácidos sulfínico/sulfónico; Ser es un sustituto «redox-muerto» del tiol (Choi et al., 2018)."},
+  {q:"Al ampliar la tolerancia de fragmentos de ±0.5 a ±1.5 Da, ¿qué pasa con el score del candidato correcto?",o:["Baja, porque aumenta la probabilidad de coincidencias al azar","Sube siempre, porque coinciden más iones","No cambia","Se vuelve negativo"],a:0,x:"Con una ventana más ancha cualquier pico de ruido puede coincidir, así que p aumenta y una misma cantidad de coincidencias es menos significativa. Pruébalo en el modo Exploración."}
+ ];}
+};
+S.m6={spot:3,key:"b",cand:null,tol:0.5,val:false,focus:null};
+
+const MODS={1:M1,2:M2,3:M3,4:M4,5:M5,6:M6};
+
+/* =============== Marco general =============== */
+function renderPipe(){
+ $("pipe").innerHTML=Object.entries(MODS).map(([k,m])=>`<button class="stage" data-mod="${k}" aria-current="${+k===S.mod?"step":"false"}"><span class="n">${String(k).padStart(2,"0")}</span><span class="t">${m.title}</span><span class="s">${m.soon?"<i>En construcción</i>":m.short}</span></button>`).join("");
+ document.querySelectorAll(".stage").forEach(b=>b.onclick=()=>setModule(+b.dataset.mod));
+}
+function renderRefs(){$("refList").innerHTML=MODS[S.mod].refs.map(r=>`<li>${REF[r]}</li>`).join("");}
+function renderGuide(){
+ const M=MODS[S.mod],i=S.g[S.mod],g=M.guide[i];
+ $("side").innerHTML=`<div class="guide-step">
+   <div class="count">Paso ${i+1} de ${M.guide.length}</div><h2>${g.t}</h2><p>${g.h}</p>
+   ${g.f?`<div class="formula">${g.f}</div>`:""}${g.note?`<p class="note">${g.note()}</p>`:""}
+   <div class="cite">Fuente: ${g.c}</div>
+   <div class="row" style="justify-content:space-between"><div class="dots">${M.guide.map((_,k)=>`<span class="${k<=i?"on":""}"></span>`).join("")}</div>
+   <div class="row"><button class="btn" id="gPrev" ${i===0?"disabled":""}>Anterior</button><button class="btn primary" id="gNext">${i===M.guide.length-1?"Ir a evaluación":"Siguiente"}</button></div></div></div>`;
+ M.viz(g.s);
+ $("gPrev").onclick=()=>{S.g[S.mod]--;renderGuide();};
+ $("gNext").onclick=()=>{if(i===M.guide.length-1){setMode("eval");return;}S.g[S.mod]++;renderGuide();};
+}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function renderQuiz(){
+ const M=MODS[S.mod];const Qs=M.quiz().map(Q=>{const ans=Q.o[Q.a];return {...Q,ans,o:shuffle([...new Set(Q.o)])};});
+ $("side").innerHTML=`<div class="quiz"><div><div class="eyebrow">Evaluación · Módulo ${S.mod}</div><h2>Comprueba lo aprendido</h2><p class="note">Algunas preguntas cambian sus valores en cada versión.</p></div>
+  ${Qs.map((Q,i)=>`<div class="q" data-i="${i}"><b>${i+1}. ${Q.q}</b><div class="opts">${Q.o.map((o,j)=>`<label><input type="radio" name="q${i}" id="q${i}o${j}" value="${j}"> <span>${o}</span></label>`).join("")}</div><div class="fb" hidden></div></div>`).join("")}
+  <div class="row"><button class="btn primary" id="qCheck">Calificar</button><button class="btn" id="qNew">Nueva versión</button><span class="score" id="qScore"></span></div></div>`;
+ $("qCheck").onclick=()=>{let sc=0;
+  document.querySelectorAll(".q").forEach(el=>{const Q=Qs[+el.dataset.i],sel=el.querySelector("input:checked");
+   const ok=sel&&Q.o[+sel.value]===Q.ans;if(ok)sc++;
+   el.querySelectorAll("label").forEach(l=>{l.classList.remove("right","wrong");const v=Q.o[+l.querySelector("input").value];
+    if(v===Q.ans)l.classList.add("right");else if(sel&&l.contains(sel))l.classList.add("wrong");});
+   const fb=el.querySelector(".fb");fb.hidden=false;fb.innerHTML=(ok?"<b>Correcto.</b> ":"<b>Revisa esto.</b> ")+Q.x;});
+  $("qScore").textContent=`${sc} / ${Qs.length} · calificación ${(10*sc/Qs.length).toFixed(1)}`;};
+ $("qNew").onclick=renderQuiz;
+ const last=S.mod===6?M.guide[1].s:M.guide[M.guide.length-1].s;M.viz(last);
+}
+function renderExplore(){const M=MODS[S.mod];
+ $("side").innerHTML=`<div><div class="eyebrow">Exploración · Módulo ${S.mod}</div><h2>${M.title}</h2></div>`+M.explore();
+ if(S.mod===3){S.m3.phase=5;}
+ M.viz(S.mod===3||S.mod===6?null:{top:true,bca:true,hl:[]});if(S.mod===3){gel.retarget();M3.table();}
+ M.bindExplore();}
+function render(){
+ renderPipe();renderRefs();const M=MODS[S.mod];
+ $("protoLine").innerHTML=`<b>Protocolo:</b> ${M.proto}`;
+ $("bench").hidden=!!M.soon;$("soon").hidden=!M.soon;
+ if(M.soon){$("soon").innerHTML=`<div class="eyebrow">Módulo 0${S.mod}</div><h2>${M.title}</h2><span class="lbl">Contenido previsto</span><ul>${M.plan.map(x=>`<li>${x}</li>`).join("")}</ul><div><button class="btn primary" id="back5">Volver al Módulo 5</button></div>`;$("back5").onclick=()=>setModule(5);return;}
+ if(S.mode==="guide")renderGuide();else if(S.mode==="explore")renderExplore();else renderQuiz();
+}
+function setModule(m){S.mod=m;$("viz").innerHTML="";render();window.scrollTo({top:0,behavior:"smooth"});}
+function setMode(m){S.mode=m;["guide","explore","eval"].forEach(k=>$("m-"+k).setAttribute("aria-pressed",String(k===m)));render();}
+$("m-guide").onclick=()=>setMode("guide");$("m-explore").onclick=()=>setMode("explore");$("m-eval").onclick=()=>setMode("eval");
+$("projBtn").onclick=()=>{const on=document.documentElement.classList.toggle("proj");$("projBtn").setAttribute("aria-pressed",String(on));$("projBtn").textContent=on?"Salir de proyección":"Modo proyección";};
+render();
+})();
+</script>
+
+</body>
+</html>

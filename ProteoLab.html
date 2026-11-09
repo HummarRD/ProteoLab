@@ -1,9 +1,17 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="ProteoLab: simulador didáctico de proteómica basada en gel 2D (Choi et al., 2018).">
+<meta name="author" content="Humberto Martínez-Orozco">
 <title>ProteoLab</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
+:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}
+
 /* Layout: banda superior con el flujo de 6 módulos del protocolo; debajo, panel de control (izq.) + banco de trabajo visual (der.) */
 :root{
   --bg:#f3f5f8; --surface:#ffffff; --ink:#18212f; --muted:#5a6678; --line:#d8dee8;
@@ -144,6 +152,15 @@ tr.click{cursor:pointer}
 .fb{font-size:.88rem;border-left:3px solid var(--accent);padding-left:10px}
 .score{font:700 1.1rem var(--f-display)}
 
+.ladder{display:flex;flex-wrap:wrap;align-items:center;row-gap:10px;font-family:var(--f-mono);padding:6px 0}
+.ladder .aa{display:inline-flex;flex-direction:column;align-items:center;min-width:1.35em;font-weight:600;border-radius:4px;padding:1px 2px;line-height:1.1}
+.ladder .aa sub{font-size:.55rem;color:var(--muted);font-weight:400}
+.ladder .aa.c{outline:2px solid var(--cys)}
+.ladder .aa.p{outline:2px solid var(--pro)}
+.ladder .brk{display:inline-flex;flex-direction:column;justify-content:space-between;height:2.1em;width:5px}
+.ladder .brk i{display:block;width:2px;height:.8em;margin:0 auto;background:transparent}
+.ladder .brk i.bb.on{background:var(--basic)}
+.ladder .brk i.yy.on{background:var(--cut)}
 .soon-panel ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
 .refs{font-size:.85rem;color:var(--muted)}
 .refs ol{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:5px;max-width:115ch}
@@ -152,6 +169,8 @@ footer.credit{font-size:.8rem;color:var(--muted)}
 .proj .side-text{display:none}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
+</head>
+<body>
 
 <div class="wrap" id="app">
   <header class="top">
@@ -183,7 +202,7 @@ footer.credit{font-size:.8rem;color:var(--muted)}
     <h3 id="refsH">Fuentes de este módulo</h3>
     <ol id="refList"></ol>
   </section>
-  <footer class="credit">ProteoLab · prototipo v0.2 · Protocolo base: Choi et al., Mol Cell Proteomics 2018 · Diseño docente: Humberto Martínez-Orozco</footer>
+  <footer class="credit">ProteoLab · versión 1.0 · Protocolo base: Choi et al., Mol Cell Proteomics 2018 · Diseño docente: Humberto Martínez-Orozco</footer>
 </div>
 
 <script>
@@ -239,7 +258,7 @@ PF.forEach(p=>{p.pI=pI(p);p.mw=avgMW(p);});
 const mz=(M,z)=>(M+z*PROTON)/z;
 
 /* =============== Estado =============== */
-const S={mod:1,mode:"guide",g:{1:0,2:0,3:0,4:0,5:0},
+const S={mod:1,mode:"guide",g:{1:0,2:0,3:0,4:0,5:0,6:0},
  m1:{group:"d9",weight:25},
  m2:{abs:0.62,dil:5,target:150},
  m3:{phase:0,cond:"ctrl",range:"4-7",labels:true,sel:3},
@@ -592,11 +611,138 @@ const M5={
  ];}
 };
 
-/* =============== MÓDULO 6 (pendiente) =============== */
-const M6={title:"Búsqueda Mascot y modificaciones de Cys",short:"±0.5 Da · Ion score ≥ 30",soon:true,
- proto:"PLGS 2.3 → Mascot 2.2.0 contra NCBInr y SwissProt (<i>Mus musculus</i>) · tripsina, ≤ 1 escisión fallida · tolerancia ±0.5 Da en precursor y fragmentos · modificaciones variables, incluidas Cys di-/trioxidación, carbamidometilación, propionamida, oxidación de Met y fosforilación · ion score = −10·log(P), puntaje ≥ 30 · validación manual de espectros.",
- refs:["choi","perkins","steen"],
- plan:["Series de iones b/y calculadas para los péptidos 84–115 y 136–153","Comparación del espectro con candidatos teóricos dentro de ±0.5 Da","Asignación de la modificación de Cys a partir de Δm","Ion score de Mascot y umbral de significancia","Validación: Western blot 2D y viabilidad de mutantes C90S/C152S y C90D/C152D en células HT-22"]};
+/* =============== MÓDULO 6 · Búsqueda en base de datos y validación =============== */
+const CMOD={cam:{d:CAM,l:"Carbamidometil (+57.021)"},di:{d:31.98983,l:"Dioxidación –SO₂H (+31.990)"},tri:{d:47.98474,l:"Trioxidación –SO₃H (+47.985)"},prop:{d:71.03711,l:"Propionamida (+71.037)"},ser:{d:MONO.S-MONO.C,l:"Conversión Cys→Ser (−15.977)"}};
+const PEP6={
+ a:{s:84,e:115,cys:90,label:"84–115 · contiene Cys90 (sitio activo)",
+    cands:[{c:"cam"},{c:"di"},{c:"tri"},{c:"prop"},{c:"di",p:85},{c:"tri",p:85},{c:"tri",p:89}]},
+ b:{s:136,e:153,cys:152,label:"136–153 · contiene Cys152",
+    cands:[{c:"cam"},{c:"di"},{c:"tri"},{c:"prop"},{c:"ser"}]}
+};
+function truthFor(spot,key){const pf=PF[spot];if(key==="a")return {c:pf.c90||"cam",p:pf.t85?85:null};return {c:pf.c152||"cam",p:null};}
+function hypLabel(h,key){const P=PEP6[key];let t=`Cys${P.cys} ${CMOD[h.c].l}`;if(h.p)t+=` + p${UCH[h.p-1]==="T"?"Thr":"Ser"}${h.p} (+79.966)`;return t;}
+function resMasses(key,h){const P=PEP6[key],out=[];for(let pos=P.s;pos<=P.e;pos++){let m=MONO[UCH[pos-1]];if(pos===P.cys)m+=CMOD[h.c].d;if(h.p===pos)m+=PHOS.mono;out.push(m);}return out;}
+function fragIons(rm){const L=rm.length,ions=[];let b=0,tot=rm.reduce((a,c)=>a+c,0),y;
+ for(let i=1;i<L;i++){b+=rm[i-1];y=tot-b+H2O;
+  ions.push({t:"b",n:i,m1:b+PROTON,m2:(b+2*PROTON)/2});ions.push({t:"y",n:L-i,m1:y+PROTON,m2:(y+2*PROTON)/2});}
+ return {ions,M:tot+H2O};}
+const MZLO=100,MZHI=2000;
+function simSpectrum(spot,key){
+ const h=truthFor(spot,key),{ions,M}=fragIons(resMasses(key,h)),pk=[];let sd=spot*1000+(key==="a"?7:3);
+ const rnd=()=>seeded(sd++);
+ ions.forEach(io=>{const keep=rnd()<(io.t==="y"?0.68:0.5);if(!keep)return;
+  const mzv=io.m1<=MZHI?io.m1:io.m2;if(mzv<MZLO||mzv>MZHI)return;
+  pk.push({mz:mzv+(rnd()-.5)*0.06,i:io.t==="y"?0.3+rnd()*0.7:0.12+rnd()*0.45,src:io.t+io.n});});
+ for(let k=0;k<150;k++)pk.push({mz:MZLO+rnd()*(MZHI-MZLO),i:0.02+rnd()*0.2,src:null});
+ return {peaks:pk.sort((a,b)=>a.mz-b.mz),M,h};
+}
+function lnC(n,k){let s=0;for(let i=1;i<=k;i++)s+=Math.log(n-k+i)-Math.log(i);return s;}
+function binomTailLog10(n,k,p){if(k<=0)return 0;let terms=[];for(let j=k;j<=n;j++)terms.push(lnC(n,j)+j*Math.log(p)+(n-j)*Math.log(1-p));
+ const mx=Math.max(...terms);return (mx+Math.log(terms.reduce((a,t)=>a+Math.exp(t-mx),0)))/Math.LN10;}
+function scoreCand(spec,key,h,tol){
+ const {ions,M}=fragIons(resMasses(key,h));const th=[];
+ ions.forEach(io=>{[[io.m1,1],[io.m2,2]].forEach(([m,z])=>{if(m>=MZLO&&m<=MZHI)th.push({...io,mz:m,z});});});
+ th.forEach(t=>{t.hit=spec.peaks.some(p=>Math.abs(p.mz-t.mz)<=tol);});
+ const n=th.length,k=th.filter(t=>t.hit).length,p=Math.min(0.95,spec.peaks.length*2*tol/(MZHI-MZLO));
+ const lg=binomTailLog10(n,k,p),score=Math.max(0,-10*lg);
+ return {M,dM:M-spec.M,prec:Math.abs(M-spec.M)<=tol,th,n,k,p,score};
+}
+const MUT=[["WT","Silvestre",true,"Puede oxidarse en Cys90 y Cys152"],["C90S","Cys90→Ser",false,"Ser no se oxida: Cys90 queda 'muerta' para el redox"],["C152S","Cys152→Ser",false,"Cys152 no puede oxidarse"],["C90/152S","Doble Cys→Ser",false,"Ninguna de las dos Cys puede oxidarse"],["C90D","Cys90→Asp",true,"El carboxilato de Asp imita la carga negativa de la Cys oxidada"],["C152D","Cys152→Asp",true,"Imita la Cys152 oxidada"],["C90/152D","Doble Cys→Asp",true,"Imita ambas Cys oxidadas"]];
+const M6={
+ title:"Búsqueda en base de datos y validación",short:"Mascot · ±0.5 Da · score ≥ 30",
+ proto:"PLGS 2.3 → Mascot 2.2.0 contra NCBInr y SwissProt (<i>Mus musculus</i>) · tripsina, ≤ 1 escisión fallida · sin modificaciones fijas · modificaciones variables, entre ellas carbamidometilación, propionamida, di- y trioxidación de Cys, conversión Cys→Ser y fosforilación · tolerancia ±0.5 Da en precursor y fragmentos · ion score = −10·log(P), ≥ 30 · validación manual de espectros · validación biológica en células HT-22 (H₂O₂ 0.3 mM, 2 h; xCELLigence 72 h).",
+ refs:["choi","perkins","steen","uni"],
+ guide:[
+  {t:"Del espectro a la lista de picos",s:{spot:3,key:"b",cand:2},h:"El software del equipo (PLGS 2.3) convierte cada espectro MS/MS en una lista de picos: pares de m/z e intensidad. Mascot compara esa lista contra los péptidos teóricos de las proteínas de ratón en NCBInr y SwissProt. A la izquierda de la gráfica verás picos de fragmentos reales mezclados con ruido.",c:"Choi et al., 2018; Perkins et al., 1999"},
+  {t:"Filtro por masa del precursor",s:{spot:3,key:"b",cand:2,focus:"prec"},h:"Solo se evalúan los candidatos cuya masa teórica cae a ±0.5 Da de la masa medida del precursor. En el spot 4, la hipótesis «Cys152 carbamidometilada» queda descartada: difiere en 9.036 Da de la masa observada. Como no hay modificaciones fijas, el programa prueba cada estado de la Cys como modificación variable.",f:"Δm = M(candidato) − M(observada); se acepta si |Δm| ≤ 0.5 Da",c:"Choi et al., 2018"},
+  {t:"Iones b e y",s:{spot:3,key:"b",cand:2,focus:"frag"},h:"Al fragmentarse el enlace peptídico, el ion b conserva el extremo N-terminal y el ion y conserva el C-terminal. La diferencia entre dos iones consecutivos de una serie equivale a la masa de un residuo. Así se lee la secuencia y se localiza en qué aminoácido está la masa extra.",f:"b_i = Σ(residuos 1…i) + H⁺   ·   y_j = Σ(últimos j residuos) + H₂O + H⁺",c:"Steen y Mann, 2004"},
+  {t:"Puntuación del péptido",s:{spot:3,key:"b",cand:2,focus:"score"},h:"Mascot calcula la probabilidad P de que las coincidencias entre picos observados y teóricos se deban al azar, y la expresa como ion score = −10·log₁₀(P). Choi et al. exigieron un puntaje total ≥ 30 (P ≤ 0.001) para aceptar una modificación. Aquí usamos un modelo binomial simplificado de esa idea, así que los valores absolutos no son los de Mascot.",f:"Score = −10·log₁₀ P(≥ k coincidencias de n | p)",c:"Perkins et al., 1999; Choi et al., 2018"},
+  {t:"Localizar la modificación",s:{spot:3,key:"a",cand:5,focus:"loc"},h:"En el péptido 84–115 del spot 4, «pThr85» y «pSer89» tienen exactamente la misma masa de precursor. Solo los iones b2 a b5, que contienen Thr85 pero no Ser89, distinguen ambas hipótesis. Compara sus puntajes en la tabla: esos iones definen el sitio.",c:"Steen y Mann, 2004; Choi et al., 2018"},
+  {t:"Validación biológica",s:{val:true},h:"Choi et al. confirmaron las proteoformas con Western blot 2D. Además expresaron UCH-L1 silvestre y mutantes en células HT-22 expuestas a H₂O₂. La forma silvestre y los mutantes Cys→Asp, que imitan la carga negativa de la Cys oxidada, protegieron a las células. Los mutantes Cys→Ser, que no pueden oxidarse, perdieron la protección.",c:"Choi et al., 2018"}
+ ],
+ explore(){const st=S.m6;return `
+  <div class="field"><label for="m6s">Spot del gel (proteoforma)</label><select id="m6s">${PF.map((p,i)=>`<option value="${i}">Spot ${p.spot} · ${p.txt}</option>`).join("")}</select></div>
+  <div class="field"><label for="m6k">Péptido</label><select id="m6k">${Object.entries(PEP6).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join("")}</select></div>
+  <div class="field"><label for="m6t">Tolerancia de masa: <b id="m6tv">±${fmt(st.tol,2)}</b> Da</label><input type="range" id="m6t" min="0.05" max="1.5" step="0.05" value="${st.tol}"><span class="note">El protocolo usa ±0.5 Da. Observa cómo una tolerancia amplia sube las coincidencias al azar y baja el puntaje.</span></div>
+  <label class="chk"><input type="checkbox" id="m6v" ${st.val?"checked":""}> <span>Mostrar la validación con mutantes en HT-22</span></label>
+  <p class="note">Haz clic en un candidato de la tabla para anotar sus iones sobre el espectro.</p>`;},
+ bindExplore(){const st=S.m6;$("m6s").value=String(st.spot);$("m6k").value=st.key;
+  $("m6s").onchange=e=>{st.spot=+e.target.value;st.cand=null;M6.viz();};
+  $("m6k").onchange=e=>{st.key=e.target.value;st.cand=null;M6.viz();};
+  $("m6t").oninput=e=>{st.tol=+e.target.value;$("m6tv").textContent="±"+fmt(st.tol,2);M6.viz();};
+  $("m6v").onchange=e=>{st.val=e.target.checked;M6.viz();};},
+ viz(gs){
+  const st=S.m6;
+  if(gs){if(gs.val){M6.valViz();return;}st.spot=gs.spot;st.key=gs.key;st.cand=gs.cand;st.tol=0.5;st.focus=gs.focus||null;}
+  else st.focus=null;
+  const key=st.key,P=PEP6[key],spec=simSpectrum(st.spot,key),seq=UCH.slice(P.s-1,P.e);
+  const res=P.cands.map((h,i)=>({h,i,r:scoreCand(spec,key,h,st.tol),truth:h.c===spec.h.c&&(h.p||null)===(spec.h.p||null)}));
+  const valid=res.filter(x=>x.r.prec).sort((a,b)=>b.r.score-a.r.score);
+  if(st.cand==null||!res[st.cand])st.cand=(valid[0]||res[0]).i;
+  const C=res[st.cand];
+  // espectro
+  const W=780,H=280,L=46,R=14,T=26,B=36,xm=m=>L+(m-MZLO)/(MZHI-MZLO)*(W-L-R),ym=v=>T+(1-v)*(H-T-B);
+  let g=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Espectro MS/MS simulado">`;
+  [100,400,700,1000,1300,1600,1900].forEach(m=>{g+=`<line class="grid" x1="${xm(m)}" x2="${xm(m)}" y1="${T}" y2="${ym(0)}"/><text x="${xm(m)}" y="${H-B+16}" text-anchor="middle">${m}</text>`;});
+  g+=`<line class="axis" x1="${L}" x2="${W-R}" y1="${ym(0)}" y2="${ym(0)}"/><text x="${(L+W-R)/2}" y="${H-3}" text-anchor="middle">m/z</text><text x="14" y="${T+90}" transform="rotate(-90 14 ${T+90})" text-anchor="middle">Intensidad rel.</text>`;
+  const ann=[];
+  spec.peaks.forEach(p=>{const m=C.r.th.find(t=>t.hit&&Math.abs(t.mz-p.mz)<=st.tol);
+   const col=m?(m.t==="b"?"var(--basic)":"var(--cut)"):"var(--muted)";
+   g+=`<line x1="${xm(p.mz)}" x2="${xm(p.mz)}" y1="${ym(0)}" y2="${ym(p.i)}" stroke="${col}" stroke-width="${m?2:1}" ${m?"":'opacity=".55"'}/>`;
+   if(m)ann.push({x:xm(p.mz),y:ym(p.i),l:m.t+m.n+(m.z===2?"²⁺":""),c:col,i:p.i});});
+  ann.sort((a,b)=>b.i-a.i);const used=[];
+  ann.forEach(a=>{if(used.some(u=>Math.abs(u-a.x)<16))return;used.push(a.x);g+=`<text x="${a.x}" y="${Math.max(T-4,a.y-5)}" text-anchor="middle" style="fill:${a.c};font-weight:600">${a.l}</text>`;});
+  g+=`</svg>`;
+  // escalera b/y
+  const hitB=new Set(C.r.th.filter(t=>t.hit&&t.t==="b").map(t=>t.n)),hitY=new Set(C.r.th.filter(t=>t.hit&&t.t==="y").map(t=>t.n)),Lp=seq.length;
+  let lad=`<div class="ladder">`;
+  for(let i=0;i<Lp;i++){const pos=P.s+i,mod=pos===P.cys?"c":(C.h.p===pos?"p":"");
+   lad+=`<span class="aa ${mod}" title="${UCH[pos-1]}${pos}">${seq[i]}<sub>${pos}</sub></span>`;
+   if(i<Lp-1)lad+=`<span class="brk"><i class="bb ${hitB.has(i+1)?"on":""}" title="b${i+1}"></i><i class="yy ${hitY.has(Lp-i-1)?"on":""}" title="y${Lp-i-1}"></i></span>`;}
+  lad+=`</div>`;
+  const fragRows=[];for(let i=1;i<Lp;i++){const b=C.r.th.find(t=>t.t==="b"&&t.n===i&&t.z===1)||C.r.th.find(t=>t.t==="b"&&t.n===i),y=C.r.th.find(t=>t.t==="y"&&t.n===Lp-i&&t.z===1)||C.r.th.find(t=>t.t==="y"&&t.n===Lp-i);
+   const bAny=C.r.th.some(t=>t.t==="b"&&t.n===i&&t.hit),yAny=C.r.th.some(t=>t.t==="y"&&t.n===Lp-i&&t.hit);
+   const loc=st.focus==="loc"&&i>=2&&i<=5;
+   fragRows.push(`<tr class="${loc?"hl":""}"><td class="num">${i}</td><td class="num" style="${bAny?"color:var(--basic);font-weight:600":""}">${b?fmt(b.mz,3)+(b.z===2?" (2+)":""):"–"}</td><td class="num">b${i}</td><td style="font-family:var(--f-mono);text-align:center">${seq[i-1]}${P.s+i-1===P.cys?"*":""}</td><td class="num">y${Lp-i}</td><td class="num" style="${yAny?"color:var(--cut);font-weight:600":""}">${y?fmt(y.mz,3)+(y.z===2?" (2+)":""):"–"}</td></tr>`);}
+  const best=valid[0];
+  $("viz").innerHTML=`
+   <div class="stats">
+    <div class="stat"><b>${fmt(spec.M,3)}</b><span>M observada del precursor (Da)</span></div>
+    <div class="stat"><b>${spec.peaks.length}</b><span>picos en el espectro</span></div>
+    <div class="stat"><b>${C.r.k}/${C.r.n}</b><span>iones coincidentes del candidato</span></div>
+    <div class="stat"><b style="color:${C.r.prec&&C.r.score>=30?"var(--ok)":"var(--bad)"}">${C.r.prec?fmt(C.r.score,1):"–"}</b><span>score del candidato (umbral 30)</span></div></div>
+   <div class="panel" ${st.focus==="frag"?'style="border-color:var(--accent)"':""}><div class="row" style="justify-content:space-between"><h3>Espectro MS/MS simulado · Spot ${PF[st.spot].spot} · péptido ${P.s}–${P.e}</h3><span class="note">Candidato anotado: ${hypLabel(C.h,key)}</span></div>${g}
+    <div class="legend" style="border:0;padding:0"><span><i style="background:var(--basic);border-radius:2px"></i>Ion b coincidente</span><span><i style="background:var(--cut);border-radius:2px"></i>Ion y coincidente</span><span><i style="background:var(--muted);border-radius:2px"></i>Pico sin asignar (ruido u otro ion)</span></div>
+    ${lad}
+    <p class="note">Cada marca entre residuos indica un enlace confirmado: arriba por un ion b, abajo por un ion y. Residuo con borde ámbar: Cys modificada; borde morado: sitio fosforilado.</p></div>
+   <div class="tbl-wrap" style="max-height:none" ${st.focus==="prec"||st.focus==="score"||st.focus==="loc"?'data-f="1"':""}><table><thead><tr><th>Candidato (hipótesis)</th><th class="num">M teórica</th><th class="num">Δm (Da)</th><th>Precursor ±${fmt(st.tol,2)}</th><th class="num">Iones k/n</th><th class="num">Score</th><th>Resultado</th></tr></thead><tbody>
+   ${res.map(x=>{const ok=x.r.prec&&x.r.score>=30,top=best&&x===best;return `<tr class="click ${x.i===st.cand?"hl":""} ${x.r.prec?"":"out"}" data-i="${x.i}"><td class="wrap">${hypLabel(x.h,key)}</td><td class="num">${fmt(x.r.M,4)}</td><td class="num">${(x.r.dM>=0?"+":"")+fmt(x.r.dM,3)}</td><td>${x.r.prec?'<span class="pill ok">Pasa</span>':'<span class="pill no">Excluido</span>'}</td><td class="num">${x.r.k}/${x.r.n}</td><td class="num">${x.r.prec?fmt(x.r.score,1):"–"}</td><td>${!x.r.prec?"–":top&&ok?'<span class="pill ok">Mejor asignación</span>':ok?'<span class="pill ph">Significativo</span>':'<span class="pill no">No significativo</span>'}</td></tr>`;}).join("")}
+   </tbody></table></div>
+   <p class="note">Modelo de puntuación: probabilidad binomial de obtener al menos k coincidencias entre n iones teóricos (b e y, cargas 1+ y 2+, m/z ${MZLO}–${MZHI}) cuando cada ion tiene probabilidad p = ${fmt(C.r.p,3)} de coincidir al azar con algún pico. Es una simplificación didáctica del principio probabilístico de Mascot (Perkins et al., 1999). El espectro se genera a partir de la proteoforma del spot elegido. La hipótesis correcta para este spot es: <b>${hypLabel(spec.h,key)}</b>.</p>
+   <div class="tbl-wrap"><table><thead><tr><th class="num">#</th><th class="num">b (m/z)</th><th class="num">Ion</th><th style="text-align:center">Residuo</th><th class="num">Ion</th><th class="num">y (m/z)</th></tr></thead><tbody>${fragRows.join("")}</tbody></table></div>`;
+  document.querySelectorAll("#viz tr.click").forEach(tr=>tr.onclick=()=>{st.cand=+tr.dataset.i;M6.viz(S.mode==="guide"?{...M6.guide[S.g[6]].s,cand:+tr.dataset.i}:null);});
+  if(st.val&&S.mode==="explore"){const d=document.createElement("div");$("viz").appendChild(d);M6.valViz(d);}
+ },
+ valViz(target){
+  const html=`<div class="panel"><h3>Validación 1 · Western blot 2D</h3><p style="max-width:75ch">Con geles 2D pequeños y anticuerpo anti-UCH-L1, los autores confirmaron que en el estrés crónico aumentan las formas más ácidas de UCH-L1, igual que en los geles teñidos con plata. Hicieron lo mismo con DPYL2, ARPC5, PRDX2 y HDHD2.</p></div>
+   <div class="panel"><h3>Validación 2 · Mutantes de cisteína en células HT-22</h3>
+    <p class="note">Transfección con UCH-L1-Myc (3 µg de plásmido, 7.5 µL de Lipofectamine 2000, 24 h) · estrés oxidativo con H₂O₂ 0.3 mM durante 2 h · viabilidad registrada en tiempo real con xCELLigence cada 15 min durante 72 h.</p>
+    <div class="tbl-wrap" style="max-height:none"><table><thead><tr><th>Construcción</th><th>Cambio</th><th>Lógica del diseño</th><th>Protección frente a H₂O₂</th></tr></thead><tbody>
+    ${MUT.map(m=>`<tr><td><b>${m[0]}</b></td><td>${m[1]}</td><td class="wrap">${m[3]}</td><td>${m[2]?'<span class="pill ok">Sí</span>':'<span class="pill no">Se pierde</span>'}</td></tr>`).join("")}</tbody></table></div>
+    <p style="max-width:75ch">Interpretación: si la protección dependiera solo de tener la proteína, todos los mutantes protegerían. Que los mutantes Cys→Asp protejan y los Cys→Ser no sugiere que la carga negativa en Cys90 y Cys152, como la que aportan –SO₂H y –SO₃H, contribuye a la función neuroprotectora. Sin estrés oxidativo no hubo diferencias claras entre construcciones. Los autores advierten que la conclusión proviene de experimentos <i>in vitro</i>.</p>
+    <p class="note">La tabla resume el resultado cualitativo reportado; no reproduce valores numéricos de viabilidad.</p></div>`;
+  if(target)target.innerHTML=html;else $("viz").innerHTML=html;
+ },
+ quiz(){const spec=simSpectrum(3,"b"),cam=scoreCand(spec,"b",{c:"cam"},0.5);
+  return [
+  {q:`Para el péptido 136–153 del spot 4 se observa M = ${fmt(spec.M,3)} Da. La hipótesis «Cys152 carbamidometilada» da M = ${fmt(cam.M,3)} Da. Con tolerancia de ±0.5 Da, ¿qué ocurre con ella?`,o:["Se excluye, porque Δm = "+fmt(cam.dM,3)+" Da supera la tolerancia","Se acepta, porque la Cys siempre se carbamidometila","Se acepta, porque los iones b coinciden","No puede evaluarse sin el pI"],a:0,x:`57.021 − 47.985 = 9.036 Da: la diferencia supera por mucho ±0.5 Da. Sin modificaciones fijas, Mascot puede probar el estado de oxidación correcto.`},
+  {q:"En el péptido 84–115 (Q84-T85-I86-G87-N88-S89-C90…), «pThr85» y «pSer89» tienen la misma masa de precursor. ¿Qué iones permiten distinguirlas?",o:["b2 a b5, que contienen Thr85 pero no Ser89","Solo el ion precursor","y1 e y2, en el extremo C-terminal","Ninguno; es imposible distinguirlas por MS/MS"],a:0,x:"Si el fosfato está en Thr85, b2–b5 llevan +79.966 Da; si está en Ser89, no. Los iones que flanquean los sitios posibles son los que localizan la modificación."},
+  {q:"Choi et al. aceptaron modificaciones con un score de Mascot ≥ 30. ¿A qué probabilidad de coincidencia al azar equivale?",o:["P = 0.001","P = 0.05","P = 0.30","P = 0.03"],a:0,x:"Score = −10·log₁₀(P) → 30 = −10·log₁₀(P) → P = 10⁻³."},
+  {q:"¿Por qué el mutante C90D de UCH-L1 conserva la protección frente a H₂O₂ y el C90S no?",o:["Asp aporta una carga negativa que imita a la Cys oxidada; Ser no puede oxidarse ni aporta esa carga","Asp aumenta la masa de la proteína","Ser bloquea la expresión de la proteína","Asp hace que la proteína sea más básica"],a:0,x:"El carboxilato de Asp es un mímico de los ácidos sulfínico/sulfónico; Ser es un sustituto «redox-muerto» del tiol (Choi et al., 2018)."},
+  {q:"Al ampliar la tolerancia de fragmentos de ±0.5 a ±1.5 Da, ¿qué pasa con el score del candidato correcto?",o:["Baja, porque aumenta la probabilidad de coincidencias al azar","Sube siempre, porque coinciden más iones","No cambia","Se vuelve negativo"],a:0,x:"Con una ventana más ancha cualquier pico de ruido puede coincidir, así que p aumenta y una misma cantidad de coincidencias es menos significativa. Pruébalo en el modo Exploración."}
+ ];}
+};
+S.m6={spot:3,key:"b",cand:null,tol:0.5,val:false,focus:null};
 
 const MODS={1:M1,2:M2,3:M3,4:M4,5:M5,6:M6};
 
@@ -632,18 +778,18 @@ function renderQuiz(){
    const fb=el.querySelector(".fb");fb.hidden=false;fb.innerHTML=(ok?"<b>Correcto.</b> ":"<b>Revisa esto.</b> ")+Q.x;});
   $("qScore").textContent=`${sc} / ${Qs.length} · calificación ${(10*sc/Qs.length).toFixed(1)}`;};
  $("qNew").onclick=renderQuiz;
- const last=M.guide[M.guide.length-1].s;M.viz(last);
+ const last=S.mod===6?M.guide[1].s:M.guide[M.guide.length-1].s;M.viz(last);
 }
 function renderExplore(){const M=MODS[S.mod];
  $("side").innerHTML=`<div><div class="eyebrow">Exploración · Módulo ${S.mod}</div><h2>${M.title}</h2></div>`+M.explore();
  if(S.mod===3){S.m3.phase=5;}
- M.viz(S.mod===3?null:{top:true,bca:true,hl:[]});if(S.mod===3){gel.retarget();M3.table();}
+ M.viz(S.mod===3||S.mod===6?null:{top:true,bca:true,hl:[]});if(S.mod===3){gel.retarget();M3.table();}
  M.bindExplore();}
 function render(){
  renderPipe();renderRefs();const M=MODS[S.mod];
  $("protoLine").innerHTML=`<b>Protocolo:</b> ${M.proto}`;
  $("bench").hidden=!!M.soon;$("soon").hidden=!M.soon;
- if(M.soon){$("soon").innerHTML=`<div class="eyebrow">Módulo 0${S.mod} · En construcción</div><h2>${M.title}</h2><span class="lbl">Contenido previsto</span><ul>${M.plan.map(x=>`<li>${x}</li>`).join("")}</ul><div><button class="btn primary" id="back5">Volver al Módulo 5</button></div>`;$("back5").onclick=()=>setModule(5);return;}
+ if(M.soon){$("soon").innerHTML=`<div class="eyebrow">Módulo 0${S.mod}</div><h2>${M.title}</h2><span class="lbl">Contenido previsto</span><ul>${M.plan.map(x=>`<li>${x}</li>`).join("")}</ul><div><button class="btn primary" id="back5">Volver al Módulo 5</button></div>`;$("back5").onclick=()=>setModule(5);return;}
  if(S.mode==="guide")renderGuide();else if(S.mode==="explore")renderExplore();else renderQuiz();
 }
 function setModule(m){S.mod=m;$("viz").innerHTML="";render();window.scrollTo({top:0,behavior:"smooth"});}
@@ -654,4 +800,5 @@ render();
 })();
 </script>
 
-</body></html>
+</body>
+</html>
